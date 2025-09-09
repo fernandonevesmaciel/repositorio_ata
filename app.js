@@ -324,25 +324,30 @@ if (document.getElementById('tabela-servicos')) {
 
         const querySnapshot = await getDocs(q);
         const horasTrabalhadasPorFuncionario = {};
-        const horasDisponiveisPorFuncionarioCalculadas = {}; // NOVO OBJETO
+        const horasDisponiveisPorFuncionarioCalculadas = {};
+        const diasTrabalhadosPorFuncionario = {};
 
         // Inicializa contadores
         for (const funcionario in horasDisponiveisPorFuncionario) {
             horasTrabalhadasPorFuncionario[funcionario] = 0;
-            horasDisponiveisPorFuncionarioCalculadas[funcionario] = 0; // Inicializa em 0
+            horasDisponiveisPorFuncionarioCalculadas[funcionario] = 0;
+            diasTrabalhadosPorFuncionario[funcionario] = new Set();
         }
 
-        // Soma as horas trabalhadas e as horas disponíveis
+        // Soma as horas trabalhadas, as horas disponíveis e conta os dias
         querySnapshot.forEach(doc => {
             const dados = doc.data();
-            const { nomeFuncionario, horaInicio, horaTermino } = dados;
+            const { nomeFuncionario, horaInicio, horaTermino, dataRegistro } = dados;
 
             if (horasDisponiveisPorFuncionario.hasOwnProperty(nomeFuncionario)) {
                 const minutosTrabalhados = calcularDiferencaEmMinutos(horaInicio, horaTermino);
                 horasTrabalhadasPorFuncionario[nomeFuncionario] += minutosTrabalhados;
 
-                // Adiciona a jornada de trabalho padrão para CADA serviço
                 horasDisponiveisPorFuncionarioCalculadas[nomeFuncionario] += horasDisponiveisPorFuncionario[nomeFuncionario];
+
+                // Adiciona a data ao Set para contar dias únicos
+                const dataString = dataRegistro.toDate().toISOString().split('T')[0];
+                diasTrabalhadosPorFuncionario[nomeFuncionario].add(dataString);
             }
         });
 
@@ -356,6 +361,7 @@ if (document.getElementById('tabela-servicos')) {
                     <th>Horas Disponíveis</th>
                     <th>Horas Trabalhadas</th>
                     <th>Aproveitamento</th>
+                    <th>Dias Trabalhados</th>
                 </tr>
             </thead>
             <tbody>
@@ -364,11 +370,12 @@ if (document.getElementById('tabela-servicos')) {
         const funcionarios = Object.keys(horasDisponiveisPorFuncionario);
 
         if (funcionarios.length === 0) {
-            tabelaHTML += `<tr><td colspan="4">Nenhum funcionário cadastrado ou dados para o período.</td></tr>`;
+            tabelaHTML += `<tr><td colspan="5">Nenhum funcionário cadastrado ou dados para o período.</td></tr>`;
         } else {
             for (const funcionario of funcionarios) {
-                const horasDisponiveisEmMinutos = horasDisponiveisPorFuncionarioCalculadas[funcionario]; // Usa o novo valor
+                const horasDisponiveisEmMinutos = horasDisponiveisPorFuncionarioCalculadas[funcionario];
                 const horasTrabalhadasEmMinutos = horasTrabalhadasPorFuncionario[funcionario];
+                const diasTrabalhados = diasTrabalhadosPorFuncionario[funcionario].size;
 
                 let aproveitamento = 0;
                 let corClasse = '';
@@ -388,6 +395,7 @@ if (document.getElementById('tabela-servicos')) {
                     <td>${formatarMinutosParaHoras(horasDisponiveisEmMinutos)}</td>
                     <td>${formatarMinutosParaHoras(horasTrabalhadasEmMinutos)}</td>
                     <td class="${corClasse}">${aproveitamento.toFixed(2)}%</td>
+                    <td>${diasTrabalhados}</td>
                 </tr>
             `;
             }
