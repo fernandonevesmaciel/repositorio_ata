@@ -339,3 +339,16 @@ th {
     color: rgb(189, 189, 0); /* Amarelo */
     font-weight: bold;
 }
+
+@media print {
+  table, tr, td {
+    page-break-inside: avoid !important;
+  }
+}
+
+@media print {
+  p {
+    orphans: 3;
+    widows: 3;
+  }
+}

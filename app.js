@@ -137,6 +137,7 @@ if (document.getElementById('form-servico')) {
     });
 
     // Evento para o botão 'Registrar Serviço na Lista'
+    // Evento para o botão 'Registrar Serviço na Lista'
     btnRegistrar.addEventListener('click', (e) => {
         e.preventDefault();
 
@@ -159,6 +160,7 @@ if (document.getElementById('form-servico')) {
 
         const horaInicio = formServico.elements.horaInicio.value;
         const horaTermino = formServico.elements.horaTermino.value;
+        const turnoSelecionado = formServico.elements.turno.value;
 
         const [hInicio, mInicio] = horaInicio.split(':').map(Number);
         const [hTermino, mTermino] = horaTermino.split(':').map(Number);
@@ -166,7 +168,8 @@ if (document.getElementById('form-servico')) {
         const totalMinutosInicio = hInicio * 60 + mInicio;
         const totalMinutosTermino = hTermino * 60 + mTermino;
 
-        if (totalMinutosInicio >= totalMinutosTermino) {
+        // A validação agora tem uma exceção para o 3º Turno
+        if (totalMinutosInicio >= totalMinutosTermino && turnoSelecionado !== '3 turno') {
             alert("Atenção: A hora de início não pode ser maior ou igual à hora de término. Por favor, corrija.");
             return;
         }
@@ -178,7 +181,7 @@ if (document.getElementById('form-servico')) {
             horaTermino: formServico.elements.horaTermino.value,
             nomeServico: formServico.elements.nomeServico.value,
             tipoServico: formServico.elements.tipoServico.value,
-            turno: formServico.elements.turno.value
+            turno: turnoSelecionado
         };
 
         servicosPendentes.push(novoServico);
@@ -187,7 +190,6 @@ if (document.getElementById('form-servico')) {
         salvarServicosNoLocalStorage();
         atualizarTabelaPendentes();
     });
-
     // Evento para o botão 'Enviar Todos para o Banco de Dados'
     btnEnviarTodos.addEventListener('click', async () => {
         if (servicosPendentes.length === 0) {
@@ -253,7 +255,7 @@ if (document.getElementById('tabela-servicos')) {
     // Novos elementos de filtro de horas
     const filtroMesInput = document.getElementById('filtro-mes');
     const aplicarFiltroMesBtn = document.getElementById('aplicar-filtro-mes-btn');
-    
+
     // Nova estrutura de dados para horas disponíveis por funcionário
     const horasDisponiveisPorFuncionario = {
         "Rafael": 440,
@@ -270,21 +272,30 @@ if (document.getElementById('tabela-servicos')) {
         "Phelipe": 440
         // A jornada de trabalho de 7h20m convertida para minutos (7 * 60 + 20)
     };
-    
+
     // ======================================================================================
     // FUNÇÕES GLOBAIS DENTRO DO ESCOPO DE ADMIN.HTML
     // Mover as funções de carregamento para o topo para evitar o ReferenceError
     // ======================================================================================
-    
+
     // Função para calcular a diferença de tempo em minutos
     function calcularDiferencaEmMinutos(horaInicio, horaTermino) {
         const [hInicio, mInicio] = horaInicio.split(':').map(Number);
         const [hTermino, mTermino] = horaTermino.split(':').map(Number);
+
         const totalMinutosInicio = hInicio * 60 + mInicio;
-        const totalMinutosTermino = hTermino * 60 + mTermino;
+        let totalMinutosTermino = hTermino * 60 + mTermino;
+
+        // Se a hora de término for menor que a hora de início,
+        // significa que o serviço terminou no dia seguinte.
+        // Adicionamos 24 horas (1440 minutos) à hora de término para o cálculo.
+        if (totalMinutosTermino < totalMinutosInicio) {
+            totalMinutosTermino += 1440;
+        }
+
         return totalMinutosTermino - totalMinutosInicio;
     }
-    
+
     // Função para formatar minutos em HH:MM
     function formatarMinutosParaHoras(minutos) {
         const h = Math.floor(minutos / 60);
@@ -293,73 +304,75 @@ if (document.getElementById('tabela-servicos')) {
     }
 
     // NOVA FUNÇÃO para exibir a tabela de horas por funcionário
+    // NOVA FUNÇÃO para exibir a tabela de horas por funcionário
     async function exibirHorasPorFuncionario(mesSelecionado) {
         if (!containerHorasDisponiveis) {
             console.error("Elemento 'container-horas-disponiveis' não encontrado.");
             return;
         }
-        
+
         const [ano, mes] = mesSelecionado.split('-').map(Number);
         const dataInicioMes = new Date(ano, mes - 1, 1);
         const dataFimMes = new Date(ano, mes, 1);
-    
+
         const servicosRef = collection(db, "servicos");
         const q = query(
             servicosRef,
             where("dataRegistro", ">=", dataInicioMes),
             where("dataRegistro", "<", dataFimMes)
         );
-    
+
         const querySnapshot = await getDocs(q);
         const horasTrabalhadasPorFuncionario = {};
-        const diasTrabalhadosPorFuncionario = {};
-    
+        const horasDisponiveisPorFuncionarioCalculadas = {}; // NOVO OBJETO
+
         // Inicializa contadores
         for (const funcionario in horasDisponiveisPorFuncionario) {
             horasTrabalhadasPorFuncionario[funcionario] = 0;
-            diasTrabalhadosPorFuncionario[funcionario] = new Set();
+            horasDisponiveisPorFuncionarioCalculadas[funcionario] = 0; // Inicializa em 0
         }
-    
-        // Soma as horas trabalhadas
+
+        // Soma as horas trabalhadas e as horas disponíveis
         querySnapshot.forEach(doc => {
             const dados = doc.data();
-            const { nomeFuncionario, dia, horaInicio, horaTermino } = dados;
-            
+            const { nomeFuncionario, horaInicio, horaTermino } = dados;
+
             if (horasDisponiveisPorFuncionario.hasOwnProperty(nomeFuncionario)) {
                 const minutosTrabalhados = calcularDiferencaEmMinutos(horaInicio, horaTermino);
                 horasTrabalhadasPorFuncionario[nomeFuncionario] += minutosTrabalhados;
-                diasTrabalhadosPorFuncionario[nomeFuncionario].add(dia);
+
+                // Adiciona a jornada de trabalho padrão para CADA serviço
+                horasDisponiveisPorFuncionarioCalculadas[nomeFuncionario] += horasDisponiveisPorFuncionario[nomeFuncionario];
             }
         });
-    
+
         // Gera o HTML da tabela
         let tabelaHTML = `
-            <h2>Horas por Funcionário</h2>
-            <table class="tabela-contagem">
-                <thead>
-                    <tr>
-                        <th>Funcionário</th>
-                        <th>Horas Disponíveis</th>
-                        <th>Horas Trabalhadas</th>
-                        <th>Aproveitamento</th>
-                    </tr>
-                </thead>
-                <tbody>
-        `;
-    
+        <h2>Horas por Funcionário</h2>
+        <table class="tabela-contagem">
+            <thead>
+                <tr>
+                    <th>Funcionário</th>
+                    <th>Horas Disponíveis</th>
+                    <th>Horas Trabalhadas</th>
+                    <th>Aproveitamento</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
         const funcionarios = Object.keys(horasDisponiveisPorFuncionario);
-    
+
         if (funcionarios.length === 0) {
             tabelaHTML += `<tr><td colspan="4">Nenhum funcionário cadastrado ou dados para o período.</td></tr>`;
         } else {
             for (const funcionario of funcionarios) {
-                const diasTrabalhados = diasTrabalhadosPorFuncionario[funcionario].size;
-                const horasDisponiveisEmMinutos = horasDisponiveisPorFuncionario[funcionario] * diasTrabalhados;
+                const horasDisponiveisEmMinutos = horasDisponiveisPorFuncionarioCalculadas[funcionario]; // Usa o novo valor
                 const horasTrabalhadasEmMinutos = horasTrabalhadasPorFuncionario[funcionario];
-                
+
                 let aproveitamento = 0;
                 let corClasse = '';
-    
+
                 if (horasDisponiveisEmMinutos > 0) {
                     aproveitamento = (horasTrabalhadasEmMinutos / horasDisponiveisEmMinutos) * 100;
                     if (aproveitamento > 100) {
@@ -368,77 +381,90 @@ if (document.getElementById('tabela-servicos')) {
                         corClasse = 'yellow-text';
                     }
                 }
-    
+
                 tabelaHTML += `
-                    <tr>
-                        <td>${funcionario}</td>
-                        <td>${formatarMinutosParaHoras(horasDisponiveisEmMinutos)}</td>
-                        <td>${formatarMinutosParaHoras(horasTrabalhadasEmMinutos)}</td>
-                        <td class="${corClasse}">${aproveitamento.toFixed(2)}%</td>
-                    </tr>
-                `;
+                <tr>
+                    <td>${funcionario}</td>
+                    <td>${formatarMinutosParaHoras(horasDisponiveisEmMinutos)}</td>
+                    <td>${formatarMinutosParaHoras(horasTrabalhadasEmMinutos)}</td>
+                    <td class="${corClasse}">${aproveitamento.toFixed(2)}%</td>
+                </tr>
+            `;
             }
         }
-    
+
         tabelaHTML += `
-                </tbody>
-            </table>
-        `;
-        
+            </tbody>
+        </table>
+    `;
+
         containerHorasDisponiveis.innerHTML = tabelaHTML;
     }
-    
     // Função para exportar a tabela visível para PDF
     async function exportarParaPDF(mesSelecionado) {
         if (!mesSelecionado) return;
-    
+
         const [ano, mes] = mesSelecionado.split('-').map(Number);
         const dataInicioMes = new Date(ano, mes - 1, 1);
         const dataFimMes = new Date(ano, mes, 1);
-    
+
         const q = query(
             collection(db, "servicos"),
             where("dataRegistro", ">=", dataInicioMes),
             where("dataRegistro", "<", dataFimMes),
             orderBy("dataRegistro", "asc")
         );
-    
+
         const querySnapshot = await getDocs(q);
         const dadosExportar = [];
         querySnapshot.forEach(doc => {
             dadosExportar.push(doc.data());
         });
-    
+
         if (dadosExportar.length === 0) {
             alert("Nenhum serviço encontrado para o mês selecionado.");
             return;
         }
-    
+
         const contagemDeServicoHTML = await gerarQuantidadesDeServicoHTML(mesSelecionado);
         const horasPorFuncionarioHTML = await gerarHorasPorFuncionarioPDF(mesSelecionado);
-    
+
         const tabelaHTML = `
-            <style>
-                table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    table-layout: fixed;
-                    margin-top: 20px;
+        <style>
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                table-layout: fixed;
+                margin-top: 20px;
+            }
+            th, td {
+                border: 1px solid #ddd;
+                padding: 8px;
+                text-align: left;
+                word-wrap: break-word;
+            }
+            th {
+                background-color: #f2f2f2;
+            }
+            @media print {
+                table, tr, td {
+                    page-break-inside: avoid;
                 }
-                th, td {
-                    border: 1px solid #ddd;
-                    padding: 8px;
-                    text-align: left;
-                    word-wrap: break-word;
+                .tabela-relatorio {
+                    page-break-after: always;
                 }
-                th {
-                    background-color: #f2f2f2;
-                }
-            </style>
-            <h1>Relatório de Serviços - Mês: ${mes} / ${ano}</h1>
-            <br>
+            }
+        </style>
+        <h1>Relatório de Serviços - Mês: ${mes} / ${ano}</h1>
+        <br>
+        <div class="tabela-relatorio">
             ${contagemDeServicoHTML}
+        </div>
+        <div class="tabela-relatorio">
             ${horasPorFuncionarioHTML}
+        </div>
+        <div class="tabela-relatorio">
+            <h2>Serviços realizados no mês</h2>
             <table id="tabela-exportar">
                 <thead>
                     <tr>
@@ -465,52 +491,53 @@ if (document.getElementById('tabela-servicos')) {
                     `).join('')}
                 </tbody>
             </table>
-        `;
-    
+        </div>
+    `;
+
         const opt = {
             margin: 1,
             filename: `relatorio-servicos-${mes}-${ano}.pdf`,
             image: { type: 'jpeg', quality: 0.98 },
             html2canvas: { scale: 2 },
-            jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' }
+            jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' },
+            pagebreak: { mode: 'avoid-all' }
         };
-    
+
         html2pdf().from(tabelaHTML).set(opt).save();
     }
-    
     // Nova função para gerar a tabela de horas para o PDF
     async function gerarHorasPorFuncionarioPDF(mesSelecionado) {
         const [ano, mes] = mesSelecionado.split('-').map(Number);
         const dataInicioMes = new Date(ano, mes - 1, 1);
         const dataFimMes = new Date(ano, mes, 1);
-    
+
         const servicosRef = collection(db, "servicos");
         const q = query(
             servicosRef,
             where("dataRegistro", ">=", dataInicioMes),
             where("dataRegistro", "<", dataFimMes)
         );
-    
+
         const querySnapshot = await getDocs(q);
         const horasTrabalhadasPorFuncionario = {};
         const diasTrabalhadosPorFuncionario = {};
-    
+
         for (const funcionario in horasDisponiveisPorFuncionario) {
             horasTrabalhadasPorFuncionario[funcionario] = 0;
             diasTrabalhadosPorFuncionario[funcionario] = new Set();
         }
-    
+
         querySnapshot.forEach(doc => {
             const dados = doc.data();
             const { nomeFuncionario, dia, horaInicio, horaTermino } = dados;
-            
+
             if (horasDisponiveisPorFuncionario.hasOwnProperty(nomeFuncionario)) {
                 const minutosTrabalhados = calcularDiferencaEmMinutos(horaInicio, horaTermino);
                 horasTrabalhadasPorFuncionario[nomeFuncionario] += minutosTrabalhados;
                 diasTrabalhadosPorFuncionario[nomeFuncionario].add(dia);
             }
         });
-    
+
         let tabelaHTML = `
             <h2>Horas por Funcionário</h2>
             <table class="tabela-contagem">
@@ -524,9 +551,9 @@ if (document.getElementById('tabela-servicos')) {
                 </thead>
                 <tbody>
         `;
-    
+
         const funcionarios = Object.keys(horasDisponiveisPorFuncionario);
-    
+
         if (funcionarios.length === 0) {
             tabelaHTML += `<tr><td colspan="4">Nenhum funcionário cadastrado ou dados para o período.</td></tr>`;
         } else {
@@ -534,10 +561,10 @@ if (document.getElementById('tabela-servicos')) {
                 const diasTrabalhados = diasTrabalhadosPorFuncionario[funcionario].size;
                 const horasDisponiveisEmMinutos = horasDisponiveisPorFuncionario[funcionario] * diasTrabalhados;
                 const horasTrabalhadasEmMinutos = horasTrabalhadasPorFuncionario[funcionario];
-                
+
                 let aproveitamento = 0;
                 let corClasse = '';
-    
+
                 if (horasDisponiveisEmMinutos > 0) {
                     aproveitamento = (horasTrabalhadasEmMinutos / horasDisponiveisEmMinutos) * 100;
                     if (aproveitamento > 100) {
@@ -546,7 +573,7 @@ if (document.getElementById('tabela-servicos')) {
                         corClasse = 'yellow-text';
                     }
                 }
-    
+
                 tabelaHTML += `
                     <tr>
                         <td>${funcionario}</td>
@@ -557,15 +584,15 @@ if (document.getElementById('tabela-servicos')) {
                 `;
             }
         }
-    
+
         tabelaHTML += `
                 </tbody>
             </table>
         `;
-        
+
         return tabelaHTML;
     }
-    
+
     // NOVA FUNÇÃO para exibir a contagem de serviços por tipo
     async function exibirQuantidadesDeServico(mesSelecionado, inserirNoHtml = false) {
         const quantidadesHTML = await gerarQuantidadesDeServicoHTML(mesSelecionado);
@@ -574,14 +601,14 @@ if (document.getElementById('tabela-servicos')) {
             containerDados.innerHTML = quantidadesHTML;
         }
     }
-    
+
     // NOVA FUNÇÃO para gerar o HTML da tabela de contagem
     async function gerarQuantidadesDeServicoHTML(mesSelecionado) {
         try {
             if (!mesSelecionado) {
                 return `<h2>Quantidade de Serviços por Tipo</h2><p>Selecione um mês para exibir os dados.</p>`;
             }
-    
+
             const tiposServico = [
                 "ajuste/reparo/concerto",
                 "emergencial",
@@ -594,40 +621,40 @@ if (document.getElementById('tabela-servicos')) {
                 "fabricacao_montagem",
                 "lubrificacao"
             ];
-    
+
             const [ano, mes] = mesSelecionado.split('-').map(Number);
             const dataInicioMes = new Date(ano, mes - 1, 1);
             const dataFimMes = new Date(ano, mes, 1);
-    
+
             const servicosRef = collection(db, "servicos");
             const q = query(
                 servicosRef,
                 where("dataRegistro", ">=", dataInicioMes),
                 where("dataRegistro", "<", dataFimMes)
             );
-    
+
             const querySnapshot = await getDocs(q);
             const servicosUnicos = {};
-    
+
             querySnapshot.forEach(doc => {
                 const dados = doc.data();
                 const chave = `${dados.turno}-${dados.dia}-${dados.horaInicio}-${dados.horaTermino}`;
-                
+
                 if (!servicosUnicos[chave]) {
                     servicosUnicos[chave] = dados;
                 }
             });
-    
+
             const contagemPorTipo = {};
             tiposServico.forEach(tipo => contagemPorTipo[tipo] = 0);
-    
+
             for (const chave in servicosUnicos) {
                 const servico = servicosUnicos[chave];
                 if (contagemPorTipo.hasOwnProperty(servico.tipoServico)) {
                     contagemPorTipo[servico.tipoServico]++;
                 }
             }
-    
+
             let horasHTML = `
                 <h2>Quantidade de Serviços por Tipo</h2>
                 <table class="tabela-contagem">
@@ -639,9 +666,9 @@ if (document.getElementById('tabela-servicos')) {
                     </thead>
                     <tbody>
             `;
-    
+
             if (Object.keys(servicosUnicos).length === 0) {
-                 horasHTML += `<tr><td colspan="2">Nenhum serviço encontrado para o período selecionado.</td></tr>`;
+                horasHTML += `<tr><td colspan="2">Nenhum serviço encontrado para o período selecionado.</td></tr>`;
             } else {
                 for (const tipo of tiposServico) {
                     const quantidade = contagemPorTipo[tipo] || 0;
@@ -655,14 +682,14 @@ if (document.getElementById('tabela-servicos')) {
                     }
                 }
             }
-            
+
             horasHTML += `
                         </tbody>
                     </table>
                 `;
-    
+
             return horasHTML;
-    
+
         } catch (error) {
             console.error("Erro ao gerar HTML para quantidade de serviços: ", error);
             return `<h2>Quantidade de Serviços por Tipo</h2><p>Erro ao carregar os dados.</p>`;
@@ -676,7 +703,7 @@ if (document.getElementById('tabela-servicos')) {
             let servicosRef = collection(db, "servicos");
             let q;
             let filtrosAplicados = false;
-    
+
             if (filtroAtual === 'funcionario') {
                 const nomeFuncionario = formFiltros.elements.filtroFuncionario.value;
                 if (nomeFuncionario) {
@@ -705,12 +732,12 @@ if (document.getElementById('tabela-servicos')) {
                     filtrosAplicados = true;
                 }
             }
-            
+
             // Se nenhum filtro for aplicado ou o filtro estiver vazio, carregue todos os dados.
             if (!filtrosAplicados) {
                 q = query(servicosRef, orderBy("dataRegistro", "asc"), orderBy("horaInicio", "asc"), orderBy("nomeFuncionario", "asc"));
             }
-    
+
             const querySnapshot = await getDocs(q);
             tabelaCorpo.innerHTML = '';
             querySnapshot.forEach((doc) => {
@@ -719,11 +746,11 @@ if (document.getElementById('tabela-servicos')) {
                 row.setAttribute('data-doc-id', doc.id); // Adiciona o ID do documento à linha para referência
 
                 row.insertCell(0).textContent = dados.nomeFuncionario;
-    
+
                 const dataObjeto = dados.dataRegistro.toDate();
                 const dataFormatada = dataObjeto.toLocaleDateString('pt-BR');
                 row.insertCell(1).textContent = dataFormatada;
-    
+
                 row.insertCell(2).textContent = dados.horaInicio;
                 row.insertCell(3).textContent = dados.horaTermino;
                 row.insertCell(4).textContent = dados.nomeServico;
@@ -747,18 +774,18 @@ if (document.getElementById('tabela-servicos')) {
                 btnExcluir.addEventListener('click', () => excluirServico(doc.id));
                 cellAcoes.appendChild(btnExcluir);
             });
-    
+
             if (filtrosAplicados) {
                 tabelaContainer.scrollTop = 0;
             } else {
                 tabelaContainer.scrollTop = tabelaContainer.scrollHeight;
             }
-    
+
         } catch (error) {
             console.error("Erro ao carregar dados: ", error);
         }
     }
-    
+
     // NOVO: Função para iniciar o processo de edição
     function iniciarEdicao(docId, dados, row) {
         // Encontra a linha da tabela a partir do docId
@@ -774,7 +801,7 @@ if (document.getElementById('tabela-servicos')) {
             const celula = linha.cells[i];
             const valorAtual = celula.textContent;
             celula.innerHTML = '';
-            
+
             const input = document.createElement('input');
             input.type = 'text';
             input.value = valorAtual;
@@ -815,10 +842,10 @@ if (document.getElementById('tabela-servicos')) {
                 tipoServico: row.cells[5].querySelector('input').value,
                 turno: row.cells[6].querySelector('input').value
             };
-            
+
             // Corrige o formato da data para o Firestore
             dadosAtualizados.dataRegistro = new Date(dadosAtualizados.dia.replace(/-/g, '\/'));
-            
+
             await updateDoc(servicoRef, dadosAtualizados);
             alert("Serviço atualizado com sucesso!");
             carregarDadosServicos(); // Recarrega os dados para mostrar as alterações
@@ -827,7 +854,7 @@ if (document.getElementById('tabela-servicos')) {
             alert("Erro ao salvar. Verifique o console.");
         }
     }
-    
+
     // NOVO: Função para cancelar a edição
     function cancelarEdicao(row, originalData) {
         row.cells[0].innerHTML = originalData.nomeFuncionario;
@@ -853,7 +880,7 @@ if (document.getElementById('tabela-servicos')) {
         btnExcluir.addEventListener('click', () => excluirServico(row.getAttribute('data-doc-id')));
         cellAcoes.appendChild(btnExcluir);
     }
-    
+
     // NOVO: Função para excluir um serviço
     async function excluirServico(docId) {
         if (confirm("Tem certeza que deseja excluir este serviço?")) {
@@ -916,11 +943,11 @@ if (document.getElementById('tabela-servicos')) {
         }
     });
 
-    
+
     // ======================================================================================
     // FIM DAS FUNÇÕES
     // ======================================================================================
-    
+
     // Listener para o novo botão de filtro por mês
     if (aplicarFiltroMesBtn) {
         aplicarFiltroMesBtn.addEventListener('click', () => {
@@ -928,7 +955,7 @@ if (document.getElementById('tabela-servicos')) {
             exibirHorasPorFuncionario(filtroMesInput.value);
         });
     }
-    
+
     // Listener para o botão de alternância (agora mostra contagem)
     toggleBtn.addEventListener('click', () => {
         if (visualizadorHoras.style.display === 'none') {
