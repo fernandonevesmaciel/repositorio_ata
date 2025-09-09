@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel do Administrador</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <div class="container">
+        <h1>Relatórios de Serviços</h1>
+        <div class="opcoes-admin">
+            <button id="exportar-pdf">Exportar para PDF</button>
+            <button id="logout">Sair</button>
+        </div>
+        <div class="filtros">
+            <h3>Filtrar Serviços</h3>
+            <form id="form-filtros">
+                <label for="filtro-selecao">Filtrar por:</label>
+                <select id="filtro-selecao" name="filtro-selecao">
+                    <option value="nenhum">Nenhum</option>
+                    <option value="funcionario">Funcionário</option>
+                    <option value="tipoServico">Tipo de Serviço</option>
+                    <option value="turno">Turno</option>
+                    <option value="data">Data</option>
+                </select>
+
+                <div id="containerFuncionario" class="filtro-container" style="display: none;">
+                    <label for="filtroFuncionario">Nome do Funcionário:</label>
+                    <select id="filtroFuncionario" name="filtroFuncionario">
+                        <option value="">Nenhum</option>
+                        <option value="Rafael">Rafael</option>
+                        <option value="Fernando">Fernando</option>
+                        <option value="Marcos">Marcos</option>
+                        <option value="Alisson">Alisson</option>
+                        <option value="Eduardo">Eduardo</option>
+                        <option value="Matheus">Matheus</option>
+                        <option value="Gregory">Gregory</option>
+                        <option value="Vinicius">Vinicius</option>
+                        <option value="Simei">Simei</option>
+                        <option value="Jonathan">Jonathan</option>
+                        <option value="Cleiton">Cleiton</option>
+                        <option value="Phelipe">Phelipe</option>
+                    </select>
+                </div>
+
+                <div id="containerTipoServico" class="filtro-container" style="display: none;">
+                    <label for="filtroTipoServico">Tipo de Serviço:</label>
+                    <select id="filtroTipoServico" name="filtroTipoServico">
+                        <option value="">Selecione o tipo</option>
+                        <option value="emergencial">Emergencial</option>
+                        <option value="preventivo">Preventiva</option>
+                        <option value="qualidade">Qualidade</option>
+                        <option value="ajuste">Ajuste</option>
+                    </select>
+                </div>
+
+                <div id="containerTurno" class="filtro-container" style="display: none;">
+                    <label for="filtroTurno">Turno:</label>
+                    <select id="filtroTurno" name="filtroTurno">
+                        <option value="">Selecione o turno</option>
+                        <option value="1 turno">1º Turno</option>
+                        <option value="2 turno">2º Turno</option>
+                        <option value="3 turno">3º Turno</option>
+                    </select>
+                </div>
+
+                <div id="containerData" class="filtro-container" style="display: none;">
+                    <label for="filtroData">Data (dia):</label>
+                    <input type="date" id="filtroData" name="filtroData">
+                </div>
+
+                <button type="submit">Aplicar Filtro</button>
+                <button type="button" id="limparFiltros">Limpar Filtros</button>
+            </form>
+        </div>
+        <div class="tabela-container">
+            <table id="tabela-servicos">
+                <thead>
+                    <tr>
+                        <th>Funcionário</th>
+                        <th>Dia</th>
+                        <th>Hora Início</th>
+                        <th>Hora Término</th>
+                        <th>Nome Serviço</th>
+                        <th>Tipo Serviço</th>
+                        <th>Turno</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+        <div class="visualizador-container">
+            <button id="toggle-horas-btn" type="button">Mostrar Horas de Serviço</button>
+
+            <div id="visualizador-horas" style="display: none;">
+                <div class="filtro-horas-mes">
+                    <div><label for="filtro-mes">Filtrar por Mês:</label></div>
+                    <div><input type="month" id="filtro-mes" name="filtro-mes"></div>
+                    <div><button id="aplicar-filtro-mes-btn">Aplicar</button></div>
+                </div>
+                <h2>Horas de Serviço por Turno</h2>
+                <div id="dados-turnos">
+                </div>
+            </div>
+            <div id="modal-container" class="modal-container">
+                <div class="modal-content">
+                    <h3>Selecione o Mês para Exportar</h3>
+                    <p>Selecione um mês e ano para gerar o relatório em PDF.</p>
+                    <div class="modal-body">
+                        <input type="month" id="modal-filtro-data" required>
+                        <div class="modal-buttons">
+                            <button id="modal-exportar-btn">Exportar</button>
+                            <button id="modal-cancelar-btn">Cancelar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+            <script type="module" src="app.js"></script>
+</body>
+
+</html>
