@@ -1,4 +1,3 @@
-// Importa os módulos necessários do Firebase
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, collection, addDoc, getDocs, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -14,12 +13,12 @@ const firebaseConfig = {
     measurementId: "G-VNKBGDEZYE"
 };
 
-
 // Inicializa o Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// Lógica para a página de login (login.html)
 if (document.getElementById('form-login')) {
     const formLogin = document.getElementById('form-login');
     const mensagemLogin = document.getElementById('mensagem-login');
@@ -30,15 +29,12 @@ if (document.getElementById('form-login')) {
         const senha = formLogin.elements.senha.value;
 
         try {
-            // Autentica o usuário com e-mail e senha
             await signInWithEmailAndPassword(auth, email, senha);
-            // Se o login for bem-sucedido, redireciona para a página do painel
             window.location.href = 'admin.html';
         } catch (error) {
             console.error("Erro no login: ", error);
             let mensagemDeErro = "Ocorreu um erro. Por favor, tente novamente.";
 
-            // Tratamento de erros específicos do Firebase Auth
             switch (error.code) {
                 case 'auth/invalid-email':
                     mensagemDeErro = "E-mail inválido. Por favor, verifique o formato.";
@@ -58,46 +54,184 @@ if (document.getElementById('form-login')) {
     });
 }
 
-// Lógica para a página de registro (index.html)
+// Lógica para a página de registro de serviço (index.html)
 if (document.getElementById('form-servico')) {
     const formServico = document.getElementById('form-servico');
+    const btnRegistrar = document.getElementById('btn-registrar');
+    const btnEnviarTodos = document.getElementById('btn-enviar-todos');
+    const tabelaCorpoPendentes = document.getElementById('tabela-corpo-pendentes');
     const mensagem = document.getElementById('mensagem');
+    const tabelaContainerPendentes = document.getElementById('tabela-servicos-pendentes');
 
-    formServico.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const nome1 = formServico.elements.funcionario1.value;
-        const nome2 = formServico.elements.funcionario2.value;
-        const nome3 = formServico.elements.funcionario3.value;
-        const nome4 = formServico.elements.funcionario4.value;
+    let servicosPendentes = [];
 
-        const nomesArray = [nome1, nome2, nome3, nome4].filter(nome => nome !== '');
+    // Função para carregar serviços do localStorage
+    function carregarServicosDoLocalStorage() {
+        const servicosSalvos = localStorage.getItem('servicosPendentes');
+        if (servicosSalvos) {
+            servicosPendentes = JSON.parse(servicosSalvos);
+        }
+    }
 
-        if (nomesArray.length === 0) {
-            mensagem.textContent = "Selecione pelo menos um funcionário.";
+    // Função para salvar serviços no localStorage
+    function salvarServicosNoLocalStorage() {
+        localStorage.setItem('servicosPendentes', JSON.stringify(servicosPendentes));
+    }
+
+    // Função para atualizar a tabela na tela
+    function atualizarTabelaPendentes() {
+        tabelaCorpoPendentes.innerHTML = ''; // Limpa a tabela
+        if (servicosPendentes.length > 0) {
+            tabelaContainerPendentes.style.display = 'block';
+            servicosPendentes.forEach((servico, index) => {
+                const row = tabelaCorpoPendentes.insertRow();
+                row.insertCell(0).textContent = servico.nomesFuncionarios.join(', ');
+
+                // --- CÓDIGO EDITADO ---
+                const dataOriginal = new Date(servico.dia + 'T00:00:00'); // Cria um objeto Date
+                const dataFormatada = dataOriginal.toLocaleDateString('pt-BR'); // Formata a data para DD/MM/AAAA
+                row.insertCell(1).textContent = dataFormatada;
+                // --- FIM DO CÓDIGO EDITADO ---
+
+                row.insertCell(2).textContent = servico.horaInicio;
+                row.insertCell(3).textContent = servico.horaTermino;
+                row.insertCell(4).textContent = servico.nomeServico;
+                row.insertCell(5).textContent = servico.tipoServico;
+                row.insertCell(6).textContent = servico.turno;
+
+                // Adiciona a célula para o botão de edição
+                const celulaAcoes = row.insertCell(7);
+                const btnEditar = document.createElement('button');
+                btnEditar.textContent = 'Editar';
+                btnEditar.classList.add('btn-editar');
+                btnEditar.setAttribute('data-index', index);
+                celulaAcoes.appendChild(btnEditar);
+            });
+            btnEnviarTodos.style.display = 'block';
+        } else {
+            tabelaContainerPendentes.style.display = 'none';
+            btnEnviarTodos.style.display = 'none';
+        }
+    }
+
+    // Lógica para o botão de edição
+    tabelaCorpoPendentes.addEventListener('click', (e) => {
+        if (e.target.classList.contains('btn-editar')) {
+            const index = e.target.getAttribute('data-index');
+            const servicoParaEditar = servicosPendentes[index];
+
+            // Preenche o formulário com os dados do serviço
+            formServico.elements.funcionario1.value = servicoParaEditar.nomesFuncionarios[0] || '';
+            formServico.elements.funcionario2.value = servicoParaEditar.nomesFuncionarios[1] || '';
+            formServico.elements.funcionario3.value = servicoParaEditar.nomesFuncionarios[2] || '';
+            formServico.elements.funcionario4.value = servicoParaEditar.nomesFuncionarios[3] || '';
+            formServico.elements.dia.value = servicoParaEditar.dia;
+            formServico.elements.horaInicio.value = servicoParaEditar.horaInicio;
+            formServico.elements.horaTermino.value = servicoParaEditar.horaTermino;
+            formServico.elements.nomeServico.value = servicoParaEditar.nomeServico;
+            formServico.elements.tipoServico.value = servicoParaEditar.tipoServico;
+            formServico.elements.turno.value = servicoParaEditar.turno;
+
+            // Remove o serviço da lista e do localStorage
+            servicosPendentes.splice(index, 1);
+            salvarServicosNoLocalStorage();
+            atualizarTabelaPendentes();
+
+            mensagem.textContent = "Serviço carregado no formulário para edição.";
+        }
+    });
+
+    // Evento para o botão 'Registrar Serviço na Lista'
+   btnRegistrar.addEventListener('click', (e) => {
+    e.preventDefault();
+
+    if (!formServico.checkValidity()) {
+        formServico.reportValidity();
+        return;
+    }
+
+    const nome1 = formServico.elements.funcionario1.value;
+    const nome2 = formServico.elements.funcionario2.value;
+    const nome3 = formServico.elements.funcionario3.value;
+    const nome4 = formServico.elements.funcionario4.value;
+
+    const nomesArray = [nome1, nome2, nome3, nome4].filter(nome => nome !== '');
+
+    if (nomesArray.length === 0) {
+        mensagem.textContent = "Selecione pelo menos um funcionário.";
+        return;
+    }
+
+    // --- NOVA CONDIÇÃO ADICIONADA AQUI ---
+    const horaInicio = formServico.elements.horaInicio.value;
+    const horaTermino = formServico.elements.horaTermino.value;
+
+    // Converter as horas para minutos para uma comparação numérica mais fácil
+    const [hInicio, mInicio] = horaInicio.split(':').map(Number);
+    const [hTermino, mTermino] = horaTermino.split(':').map(Number);
+
+    const totalMinutosInicio = hInicio * 60 + mInicio;
+    const totalMinutosTermino = hTermino * 60 + mTermino;
+
+    if (totalMinutosInicio >= totalMinutosTermino) {
+        // Se a hora de início for maior ou igual à de término, exibe o popup
+        alert("Atenção: A hora de início não pode ser maior ou igual à hora de término. Por favor, corrija.");
+        return; // Interrompe o processo e não adiciona o serviço à lista
+    }
+
+        const novoServico = {
+            nomesFuncionarios: nomesArray,
+            dia: formServico.elements.dia.value,
+            horaInicio: formServico.elements.horaInicio.value,
+            horaTermino: formServico.elements.horaTermino.value,
+            nomeServico: formServico.elements.nomeServico.value,
+            tipoServico: formServico.elements.tipoServico.value,
+            turno: formServico.elements.turno.value
+        };
+
+        servicosPendentes.push(novoServico);
+        mensagem.textContent = "Serviço adicionado à lista!";
+        formServico.reset();
+        salvarServicosNoLocalStorage();
+        atualizarTabelaPendentes();
+    });
+
+    // Evento para o botão 'Enviar Todos para o Banco de Dados'
+    btnEnviarTodos.addEventListener('click', async () => {
+        if (servicosPendentes.length === 0) {
+            mensagem.textContent = "Não há serviços na lista para enviar.";
             return;
         }
 
         try {
-            for (const nome of nomesArray) {
-                await addDoc(collection(db, "servicos"), {
-                    nomeFuncionario: nome,
-                    dia: formServico.elements.dia.value,
-                    horaInicio: formServico.elements.horaInicio.value,
-                    horaTermino: formServico.elements.horaTermino.value,
-                    nomeServico: formServico.elements.nomeServico.value,
-                    tipoServico: formServico.elements.tipoServico.value,
-                    turno: formServico.elements.turno.value,
-                    // AQUI ESTÁ A ALTERAÇÃO: Salvando a data de forma correta
-                    dataRegistro: new Date(formServico.elements.dia.value.replace(/-/g, '\/'))
-                });
+            for (const servico of servicosPendentes) {
+                for (const nome of servico.nomesFuncionarios) {
+                    await addDoc(collection(db, "servicos"), {
+                        nomeFuncionario: nome,
+                        dia: servico.dia,
+                        horaInicio: servico.horaInicio,
+                        horaTermino: servico.horaTermino,
+                        nomeServico: servico.nomeServico,
+                        tipoServico: servico.tipoServico,
+                        turno: servico.turno,
+                        dataRegistro: new Date(servico.dia.replace(/-/g, '\/'))
+                    });
+                }
             }
-            mensagem.textContent = "Serviço(s) registrado(s) com sucesso!";
-            formServico.reset();
-        } catch (e) {
-            console.error("Erro ao adicionar documento: ", e);
-            mensagem.textContent = "Erro ao registrar serviço. Verifique o console para mais detalhes.";
+
+            mensagem.textContent = "Todos os serviços foram registrados com sucesso!";
+            servicosPendentes = [];
+            localStorage.removeItem('servicosPendentes');
+            atualizarTabelaPendentes();
+        } catch (error) {
+            console.error("Erro ao adicionar documentos: ", error);
+            mensagem.textContent = "Erro ao registrar serviços. Verifique o console para mais detalhes.";
         }
     });
+
+    // Ao carregar a página, tenta carregar os serviços salvos e atualiza a tabela
+    carregarServicosDoLocalStorage();
+    atualizarTabelaPendentes();
 }
 
 // Lógica para o painel do administrador (admin.html)
@@ -133,7 +267,6 @@ if (document.getElementById('tabela-servicos')) {
         if (visualizadorHoras.style.display === 'none') {
             visualizadorHoras.style.display = 'block';
             toggleBtn.textContent = 'Ocultar Horas de Serviço';
-            // Chama a função para exibir no HTML
             exibirHorasDeServicoPorTurno(filtroMesInput.value, true);
         } else {
             visualizadorHoras.style.display = 'none';
@@ -183,7 +316,6 @@ if (document.getElementById('tabela-servicos')) {
                     filtrosAplicados = true;
                 }
             } else if (!q) {
-                // Se nenhum filtro foi aplicado, ordena por data de registro mais recente
                 q = query(servicosRef, orderBy("dataRegistro", "asc"), orderBy("horaInicio", "asc"), orderBy("nomeFuncionario", "asc"));
             }
 
@@ -194,7 +326,6 @@ if (document.getElementById('tabela-servicos')) {
                 const row = tabelaCorpo.insertRow();
                 row.insertCell(0).textContent = dados.nomeFuncionario;
 
-                // Aqui convertemos o timestamp para o formato dd/mm/aaaa
                 const dataObjeto = dados.dataRegistro.toDate();
                 const dataFormatada = dataObjeto.toLocaleDateString('pt-BR');
                 row.insertCell(1).textContent = dataFormatada;
@@ -221,16 +352,10 @@ if (document.getElementById('tabela-servicos')) {
     async function exportarParaPDF(mesSelecionado) {
         if (!mesSelecionado) return;
 
-        // Pega o ano e o mês do input
         const [ano, mes] = mesSelecionado.split('-').map(Number);
-
-        // Cria um objeto Date para o primeiro dia do mês selecionado
         const dataInicioMes = new Date(ano, mes - 1, 1);
-
-        // Cria um objeto Date para o primeiro dia do próximo mês
         const dataFimMes = new Date(ano, mes, 1);
 
-        // Faz a consulta no Firestore com o filtro de mês
         const q = query(
             collection(db, "servicos"),
             where("dataRegistro", ">=", dataInicioMes),
@@ -244,46 +369,58 @@ if (document.getElementById('tabela-servicos')) {
             dadosExportar.push(doc.data());
         });
 
-        // Se não houver dados, exibe um alerta e não gera o PDF
         if (dadosExportar.length === 0) {
             alert("Nenhum serviço encontrado para o mês selecionado.");
             return;
         }
 
-        // NOVO: Chama a função para obter o HTML do gráfico de horas, sem inseri-lo na página
         const horasDeServicoHTML = await gerarHorasDeServicoHTML(mesSelecionado);
 
-        // Cria a nova tabela HTML em memória
         const tabelaHTML = `
             <style>
                 table {
                     width: 100%;
                     border-collapse: collapse;
-                    table-layout: fixed; /* Força o layout fixo */
+                    table-layout: fixed;
                     margin-top: 20px;
                 }
                 th, td {
                     border: 1px solid #ddd;
                     padding: 8px;
                     text-align: left;
-                    word-wrap: break-word; /* Permite quebras de linha longas */
+                    word-wrap: break-word;
                 }
                 th {
                     background-color: #f2f2f2;
                 }
-                /* Definição das larguras das colunas */
-                th:nth-child(1), td:nth-child(1) { width: 13%; } /* Funcionário */
-                th:nth-child(2), td:nth-child(2) { width: 12%; } /* Dia */
-                th:nth-child(3), td:nth-child(3) { width: 10%; } /* Hora Início */
-                th:nth-child(4), td:nth-child(4) { width: 10%; } /* Hora Término */
-                th:nth-child(5), td:nth-child(5) { width: 25%; } /* Nome Serviço */
-                th:nth-child(6), td:nth-child(6) { width: 15%; } /* Tipo Serviço */
-                th:nth-child(7), td:nth-child(7) { width: 10%; } /* Turno */
+                th:nth-child(1), td:nth-child(1) { width: 13%; }
+                th:nth-child(2), td:nth-child(2) { width: 12%; }
+                th:nth-child(3), td:nth-child(3) { width: 10%; }
+                th:nth-child(4), td:nth-child(4) { width: 10%; }
+                th:nth-child(5), td:nth-child(5) { width: 25%; }
+                th:nth-child(6), td:nth-child(6) { width: 15%; }
+                th:nth-child(7), td:nth-child(7) { width: 10%; }
+                .progress-bar-container {
+                    width: 100%;
+                    background-color: #f3f3f3;
+                    border-radius: 5px;
+                    margin-top: 5px;
+                }
+                .progress-bar {
+                    height: 15px;
+                    border-radius: 5px;
+                    text-align: center;
+                    color: white;
+                    font-weight: bold;
+                }
+                .emergencial { background-color: #ff6384; }
+                .qualidade { background-color: #36a2eb; }
+                .preventivo { background-color: #cc65fe; }
+                .ajuste { background-color: #ff9f40; }
             </style>
             <h1>Relatório de Serviços - Mês: ${mes} / ${ano}</h1>
             <br>
             ${horasDeServicoHTML}
-
             <table id="tabela-exportar">
                 <thead>
                     <tr>
@@ -312,7 +449,6 @@ if (document.getElementById('tabela-servicos')) {
             </table>
         `;
 
-        // Configurações para o PDF
         const opt = {
             margin: 1,
             filename: `relatorio-servicos-${mes}-${ano}.pdf`,
@@ -321,24 +457,23 @@ if (document.getElementById('tabela-servicos')) {
             jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' }
         };
 
-        // Gera e salva o PDF
         html2pdf().from(tabelaHTML).set(opt).save();
     }
 
     // Adiciona os listeners para o modal
     exportarPDFBtn.addEventListener('click', () => {
-        modalContainer.style.display = 'flex'; // Mostra o modal
+        modalContainer.style.display = 'flex';
     });
 
     modalCancelarBtn.addEventListener('click', () => {
-        modalContainer.style.display = 'none'; // Esconde o modal
+        modalContainer.style.display = 'none';
     });
 
     modalExportarBtn.addEventListener('click', () => {
         const mesSelecionado = modalFiltroData.value;
         if (mesSelecionado) {
             exportarParaPDF(mesSelecionado);
-            modalContainer.style.display = 'none'; // Esconde o modal após exportar
+            modalContainer.style.display = 'none';
         } else {
             alert("Por favor, selecione um mês para exportar.");
         }
@@ -382,7 +517,6 @@ if (document.getElementById('tabela-servicos')) {
             );
 
             const querySnapshot = await getDocs(q);
-            // ACUMULA O TOTAL DE MINUTOS PARA CADA TURNO/TIPO
             const dadosPorTurno = {};
 
             querySnapshot.forEach(doc => {
@@ -400,7 +534,6 @@ if (document.getElementById('tabela-servicos')) {
                         let totalMinutos = (hTermino * 60 + mTermino) - (hInicio * 60 + mInicio);
                         if (totalMinutos < 0) totalMinutos += 24 * 60;
 
-                        // Acumula o total de MINUTOS
                         if (!dadosPorTurno[turno]) dadosPorTurno[turno] = {};
                         if (!dadosPorTurno[turno][tipo]) dadosPorTurno[turno][tipo] = 0;
 
@@ -413,7 +546,6 @@ if (document.getElementById('tabela-servicos')) {
             let horasHTML = `
                 <h2>Horas de Serviço por Turno</h2>
                 <style>
-                    /* Estilos para a barra de progresso no PDF */
                     .progress-bar-container {
                         width: 100%;
                         background-color: #f3f3f3;
@@ -439,30 +571,20 @@ if (document.getElementById('tabela-servicos')) {
             }
 
             for (const turno of turnos) {
-                // Adiciona o cabeçalho do turno
-                horasHTML += `<h3>Turno: ${turno}</h3><ul>`;
+                hoursHTML += `<h3>Turno: ${turno}</h3><ul>`;
 
                 for (const tipo of tiposServico) {
-                    // Total de minutos acumulados para o tipo de serviço no turno
                     const totalMinutosAcumulados = (dadosPorTurno[turno] && dadosPorTurno[turno][tipo]) || 0;
-
-                    // --- NOVA LÓGICA DE FORMATAÇÃO HH.MM ---
                     const horasInteiras = Math.floor(totalMinutosAcumulados / 60);
                     const minutosRestantes = totalMinutosAcumulados % 60;
-
-                    // Garante que os minutos tenham dois dígitos (ex: 7 vira 07, 40 vira 40)
                     const minutosFormatados = String(minutosRestantes).padStart(2, '0');
-
-                    // Formato final "horas.minutos"
                     const horasFormatadas = `${horasInteiras}.${minutosFormatados}`;
 
-                    // --- NOVO CÁLCULO DE PORCENTAGEM (baseado em minutos) ---
-                    // Converte a meta (que é em horas) para minutos antes de dividir
                     const metaEmMinutos = meta[tipo] * 60;
                     let porcentagem = metaEmMinutos > 0 ? (totalMinutosAcumulados / metaEmMinutos) * 100 : 0;
                     porcentagem = Math.min(porcentagem, 100);
 
-                    horasHTML += `
+                    hoursHTML += `
                     <li>
                         ${tipo}: ${horasFormatadas} horas (${porcentagem.toFixed(0)}%)
                         <div class="progress-bar-container">
@@ -470,10 +592,10 @@ if (document.getElementById('tabela-servicos')) {
                         </div>
                     </li>`;
                 }
-                horasHTML += '</ul>';
+                hoursHTML += '</ul>';
             }
 
-            return horasHTML;
+            return hoursHTML;
 
         } catch (error) {
             console.error("Erro ao gerar HTML para horas de serviço: ", error);

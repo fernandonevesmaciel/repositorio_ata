@@ -316,3 +316,16 @@ th {
     width: 500px;
     text-align: center;
 }
+
+#conteudo-principal {
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* Opcional: centraliza os elementos horizontalmente */
+    gap: 15px; /* Adiciona um espaço entre os elementos */
+}
+
+/* Opcional: ajuste a largura dos botões para eles ficarem iguais */
+#conteudo-principal button {
+    margin: 20px;
+    width: 200px; /* Ou o valor que você preferir */
+}
