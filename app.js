@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, updateDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // Sua configuração do Firebase
 const firebaseConfig = {
@@ -87,11 +87,9 @@ if (document.getElementById('form-servico')) {
                 const row = tabelaCorpoPendentes.insertRow();
                 row.insertCell(0).textContent = servico.nomesFuncionarios.join(', ');
 
-                // --- CÓDIGO EDITADO ---
                 const dataOriginal = new Date(servico.dia + 'T00:00:00'); // Cria um objeto Date
                 const dataFormatada = dataOriginal.toLocaleDateString('pt-BR'); // Formata a data para DD/MM/AAAA
                 row.insertCell(1).textContent = dataFormatada;
-                // --- FIM DO CÓDIGO EDITADO ---
 
                 row.insertCell(2).textContent = servico.horaInicio;
                 row.insertCell(3).textContent = servico.horaTermino;
@@ -99,7 +97,6 @@ if (document.getElementById('form-servico')) {
                 row.insertCell(5).textContent = servico.tipoServico;
                 row.insertCell(6).textContent = servico.turno;
 
-                // Adiciona a célula para o botão de edição
                 const celulaAcoes = row.insertCell(7);
                 const btnEditar = document.createElement('button');
                 btnEditar.textContent = 'Editar';
@@ -120,7 +117,6 @@ if (document.getElementById('form-servico')) {
             const index = e.target.getAttribute('data-index');
             const servicoParaEditar = servicosPendentes[index];
 
-            // Preenche o formulário com os dados do serviço
             formServico.elements.funcionario1.value = servicoParaEditar.nomesFuncionarios[0] || '';
             formServico.elements.funcionario2.value = servicoParaEditar.nomesFuncionarios[1] || '';
             formServico.elements.funcionario3.value = servicoParaEditar.nomesFuncionarios[2] || '';
@@ -132,7 +128,6 @@ if (document.getElementById('form-servico')) {
             formServico.elements.tipoServico.value = servicoParaEditar.tipoServico;
             formServico.elements.turno.value = servicoParaEditar.turno;
 
-            // Remove o serviço da lista e do localStorage
             servicosPendentes.splice(index, 1);
             salvarServicosNoLocalStorage();
             atualizarTabelaPendentes();
@@ -142,42 +137,39 @@ if (document.getElementById('form-servico')) {
     });
 
     // Evento para o botão 'Registrar Serviço na Lista'
-   btnRegistrar.addEventListener('click', (e) => {
-    e.preventDefault();
+    btnRegistrar.addEventListener('click', (e) => {
+        e.preventDefault();
 
-    if (!formServico.checkValidity()) {
-        formServico.reportValidity();
-        return;
-    }
+        if (!formServico.checkValidity()) {
+            formServico.reportValidity();
+            return;
+        }
 
-    const nome1 = formServico.elements.funcionario1.value;
-    const nome2 = formServico.elements.funcionario2.value;
-    const nome3 = formServico.elements.funcionario3.value;
-    const nome4 = formServico.elements.funcionario4.value;
+        const nome1 = formServico.elements.funcionario1.value;
+        const nome2 = formServico.elements.funcionario2.value;
+        const nome3 = formServico.elements.funcionario3.value;
+        const nome4 = formServico.elements.funcionario4.value;
 
-    const nomesArray = [nome1, nome2, nome3, nome4].filter(nome => nome !== '');
+        const nomesArray = [nome1, nome2, nome3, nome4].filter(nome => nome !== '');
 
-    if (nomesArray.length === 0) {
-        mensagem.textContent = "Selecione pelo menos um funcionário.";
-        return;
-    }
+        if (nomesArray.length === 0) {
+            mensagem.textContent = "Selecione pelo menos um funcionário.";
+            return;
+        }
 
-    // --- NOVA CONDIÇÃO ADICIONADA AQUI ---
-    const horaInicio = formServico.elements.horaInicio.value;
-    const horaTermino = formServico.elements.horaTermino.value;
+        const horaInicio = formServico.elements.horaInicio.value;
+        const horaTermino = formServico.elements.horaTermino.value;
 
-    // Converter as horas para minutos para uma comparação numérica mais fácil
-    const [hInicio, mInicio] = horaInicio.split(':').map(Number);
-    const [hTermino, mTermino] = horaTermino.split(':').map(Number);
+        const [hInicio, mInicio] = horaInicio.split(':').map(Number);
+        const [hTermino, mTermino] = horaTermino.split(':').map(Number);
 
-    const totalMinutosInicio = hInicio * 60 + mInicio;
-    const totalMinutosTermino = hTermino * 60 + mTermino;
+        const totalMinutosInicio = hInicio * 60 + mInicio;
+        const totalMinutosTermino = hTermino * 60 + mTermino;
 
-    if (totalMinutosInicio >= totalMinutosTermino) {
-        // Se a hora de início for maior ou igual à de término, exibe o popup
-        alert("Atenção: A hora de início não pode ser maior ou igual à hora de término. Por favor, corrija.");
-        return; // Interrompe o processo e não adiciona o serviço à lista
-    }
+        if (totalMinutosInicio >= totalMinutosTermino) {
+            alert("Atenção: A hora de início não pode ser maior ou igual à hora de término. Por favor, corrija.");
+            return;
+        }
 
         const novoServico = {
             nomesFuncionarios: nomesArray,
@@ -229,7 +221,6 @@ if (document.getElementById('form-servico')) {
         }
     });
 
-    // Ao carregar a página, tenta carregar os serviços salvos e atualiza a tabela
     carregarServicosDoLocalStorage();
     atualizarTabelaPendentes();
 }
@@ -250,6 +241,7 @@ if (document.getElementById('tabela-servicos')) {
     const tabelaContainer = document.querySelector('.tabela-container');
     const toggleBtn = document.getElementById('toggle-horas-btn');
     const visualizadorHoras = document.getElementById('visualizador-horas');
+    const containerHorasDisponiveis = document.getElementById('container-horas-disponiveis');
 
     // Novos elementos do modal
     const exportarPDFBtn = document.getElementById('exportar-pdf');
@@ -261,121 +253,170 @@ if (document.getElementById('tabela-servicos')) {
     // Novos elementos de filtro de horas
     const filtroMesInput = document.getElementById('filtro-mes');
     const aplicarFiltroMesBtn = document.getElementById('aplicar-filtro-mes-btn');
-
-    // Listener para o botão de alternância
-    toggleBtn.addEventListener('click', () => {
-        if (visualizadorHoras.style.display === 'none') {
-            visualizadorHoras.style.display = 'block';
-            toggleBtn.textContent = 'Ocultar Horas de Serviço';
-            exibirHorasDeServicoPorTurno(filtroMesInput.value, true);
-        } else {
-            visualizadorHoras.style.display = 'none';
-            toggleBtn.textContent = 'Mostrar Horas de Serviço';
-        }
-    });
-
-    // Listener para o novo botão de filtro por mês
-    if (aplicarFiltroMesBtn) {
-        aplicarFiltroMesBtn.addEventListener('click', () => {
-            exibirHorasDeServicoPorTurno(filtroMesInput.value, true);
-        });
+    
+    // Nova estrutura de dados para horas disponíveis por funcionário
+    const horasDisponiveisPorFuncionario = {
+        "Rafael": 440,
+        "Fernando": 440,
+        "Marcos": 440,
+        "Alisson": 440,
+        "Eduardo": 440,
+        "Matheus": 440,
+        "Gregory": 440,
+        "Vinicius": 440,
+        "Simei": 440,
+        "Jonathan": 440,
+        "Cleiton": 440,
+        "Phelipe": 440
+        // A jornada de trabalho de 7h20m convertida para minutos (7 * 60 + 20)
+    };
+    
+    // ======================================================================================
+    // FUNÇÕES GLOBAIS DENTRO DO ESCOPO DE ADMIN.HTML
+    // Mover as funções de carregamento para o topo para evitar o ReferenceError
+    // ======================================================================================
+    
+    // Função para calcular a diferença de tempo em minutos
+    function calcularDiferencaEmMinutos(horaInicio, horaTermino) {
+        const [hInicio, mInicio] = horaInicio.split(':').map(Number);
+        const [hTermino, mTermino] = horaTermino.split(':').map(Number);
+        const totalMinutosInicio = hInicio * 60 + mInicio;
+        const totalMinutosTermino = hTermino * 60 + mTermino;
+        return totalMinutosTermino - totalMinutosInicio;
+    }
+    
+    // Função para formatar minutos em HH:MM
+    function formatarMinutosParaHoras(minutos) {
+        const h = Math.floor(minutos / 60);
+        const m = minutos % 60;
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
     }
 
-    async function carregarDadosServicos() {
-        try {
-            const filtroAtual = filtroSelecao.value;
-            let servicosRef = collection(db, "servicos");
-            let q;
-            let filtrosAplicados = false;
-
-            if (filtroAtual === 'funcionario') {
-                const nomeFuncionario = formFiltros.elements.filtroFuncionario.value;
-                if (nomeFuncionario) {
-                    q = query(servicosRef, where("nomeFuncionario", "==", nomeFuncionario), orderBy("dataRegistro", "asc"), orderBy("horaInicio", "asc"));
-                    filtrosAplicados = true;
-                }
-            } else if (filtroAtual === 'tipoServico') {
-                const tipoServico = formFiltros.elements.filtroTipoServico.value;
-                if (tipoServico) {
-                    q = query(servicosRef, where("tipoServico", "==", tipoServico), orderBy("dataRegistro", "asc"), orderBy("horaInicio", "asc"));
-                    filtrosAplicados = true;
-                }
-            } else if (filtroAtual === 'turno') {
-                const turno = formFiltros.elements.filtroTurno.value;
-                if (turno) {
-                    q = query(servicosRef, where("turno", "==", turno), orderBy("dataRegistro", "asc"), orderBy("horaInicio", "asc"));
-                    filtrosAplicados = true;
-                }
-            } else if (filtroAtual === 'data') {
-                const dataFiltro = formFiltros.elements.filtroData.value;
-                if (dataFiltro) {
-                    const dataSelecionada = new Date(dataFiltro + 'T00:00:00');
-                    const proximoDia = new Date(dataSelecionada);
-                    proximoDia.setDate(proximoDia.getDate() + 1);
-                    q = query(servicosRef, where("dataRegistro", ">=", dataSelecionada), where("dataRegistro", "<", proximoDia), orderBy("dataRegistro", "asc"), orderBy("horaInicio", "asc"));
-                    filtrosAplicados = true;
-                }
-            } else if (!q) {
-                q = query(servicosRef, orderBy("dataRegistro", "asc"), orderBy("horaInicio", "asc"), orderBy("nomeFuncionario", "asc"));
-            }
-
-            const querySnapshot = await getDocs(q);
-            tabelaCorpo.innerHTML = '';
-            querySnapshot.forEach((doc) => {
-                const dados = doc.data();
-                const row = tabelaCorpo.insertRow();
-                row.insertCell(0).textContent = dados.nomeFuncionario;
-
-                const dataObjeto = dados.dataRegistro.toDate();
-                const dataFormatada = dataObjeto.toLocaleDateString('pt-BR');
-                row.insertCell(1).textContent = dataFormatada;
-
-                row.insertCell(2).textContent = dados.horaInicio;
-                row.insertCell(3).textContent = dados.horaTermino;
-                row.insertCell(4).textContent = dados.nomeServico;
-                row.insertCell(5).textContent = dados.tipoServico;
-                row.insertCell(6).textContent = dados.turno;
-            });
-
-            if (filtrosAplicados) {
-                tabelaContainer.scrollTop = 0;
-            } else {
-                tabelaContainer.scrollTop = tabelaContainer.scrollHeight;
-            }
-
-        } catch (error) {
-            console.error("Erro ao carregar dados: ", error);
+    // NOVA FUNÇÃO para exibir a tabela de horas por funcionário
+    async function exibirHorasPorFuncionario(mesSelecionado) {
+        if (!containerHorasDisponiveis) {
+            console.error("Elemento 'container-horas-disponiveis' não encontrado.");
+            return;
         }
-    }
-
-    // Função para exportar a tabela visível para PDF
-    async function exportarParaPDF(mesSelecionado) {
-        if (!mesSelecionado) return;
-
+        
         const [ano, mes] = mesSelecionado.split('-').map(Number);
         const dataInicioMes = new Date(ano, mes - 1, 1);
         const dataFimMes = new Date(ano, mes, 1);
-
+    
+        const servicosRef = collection(db, "servicos");
+        const q = query(
+            servicosRef,
+            where("dataRegistro", ">=", dataInicioMes),
+            where("dataRegistro", "<", dataFimMes)
+        );
+    
+        const querySnapshot = await getDocs(q);
+        const horasTrabalhadasPorFuncionario = {};
+        const diasTrabalhadosPorFuncionario = {};
+    
+        // Inicializa contadores
+        for (const funcionario in horasDisponiveisPorFuncionario) {
+            horasTrabalhadasPorFuncionario[funcionario] = 0;
+            diasTrabalhadosPorFuncionario[funcionario] = new Set();
+        }
+    
+        // Soma as horas trabalhadas
+        querySnapshot.forEach(doc => {
+            const dados = doc.data();
+            const { nomeFuncionario, dia, horaInicio, horaTermino } = dados;
+            
+            if (horasDisponiveisPorFuncionario.hasOwnProperty(nomeFuncionario)) {
+                const minutosTrabalhados = calcularDiferencaEmMinutos(horaInicio, horaTermino);
+                horasTrabalhadasPorFuncionario[nomeFuncionario] += minutosTrabalhados;
+                diasTrabalhadosPorFuncionario[nomeFuncionario].add(dia);
+            }
+        });
+    
+        // Gera o HTML da tabela
+        let tabelaHTML = `
+            <h2>Horas por Funcionário</h2>
+            <table class="tabela-contagem">
+                <thead>
+                    <tr>
+                        <th>Funcionário</th>
+                        <th>Horas Disponíveis</th>
+                        <th>Horas Trabalhadas</th>
+                        <th>Aproveitamento</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+    
+        const funcionarios = Object.keys(horasDisponiveisPorFuncionario);
+    
+        if (funcionarios.length === 0) {
+            tabelaHTML += `<tr><td colspan="4">Nenhum funcionário cadastrado ou dados para o período.</td></tr>`;
+        } else {
+            for (const funcionario of funcionarios) {
+                const diasTrabalhados = diasTrabalhadosPorFuncionario[funcionario].size;
+                const horasDisponiveisEmMinutos = horasDisponiveisPorFuncionario[funcionario] * diasTrabalhados;
+                const horasTrabalhadasEmMinutos = horasTrabalhadasPorFuncionario[funcionario];
+                
+                let aproveitamento = 0;
+                let corClasse = '';
+    
+                if (horasDisponiveisEmMinutos > 0) {
+                    aproveitamento = (horasTrabalhadasEmMinutos / horasDisponiveisEmMinutos) * 100;
+                    if (aproveitamento > 100) {
+                        corClasse = 'red-text';
+                    } else if (aproveitamento < 50) {
+                        corClasse = 'yellow-text';
+                    }
+                }
+    
+                tabelaHTML += `
+                    <tr>
+                        <td>${funcionario}</td>
+                        <td>${formatarMinutosParaHoras(horasDisponiveisEmMinutos)}</td>
+                        <td>${formatarMinutosParaHoras(horasTrabalhadasEmMinutos)}</td>
+                        <td class="${corClasse}">${aproveitamento.toFixed(2)}%</td>
+                    </tr>
+                `;
+            }
+        }
+    
+        tabelaHTML += `
+                </tbody>
+            </table>
+        `;
+        
+        containerHorasDisponiveis.innerHTML = tabelaHTML;
+    }
+    
+    // Função para exportar a tabela visível para PDF
+    async function exportarParaPDF(mesSelecionado) {
+        if (!mesSelecionado) return;
+    
+        const [ano, mes] = mesSelecionado.split('-').map(Number);
+        const dataInicioMes = new Date(ano, mes - 1, 1);
+        const dataFimMes = new Date(ano, mes, 1);
+    
         const q = query(
             collection(db, "servicos"),
             where("dataRegistro", ">=", dataInicioMes),
             where("dataRegistro", "<", dataFimMes),
             orderBy("dataRegistro", "asc")
         );
-
+    
         const querySnapshot = await getDocs(q);
         const dadosExportar = [];
         querySnapshot.forEach(doc => {
             dadosExportar.push(doc.data());
         });
-
+    
         if (dadosExportar.length === 0) {
             alert("Nenhum serviço encontrado para o mês selecionado.");
             return;
         }
-
-        const horasDeServicoHTML = await gerarHorasDeServicoHTML(mesSelecionado);
-
+    
+        const contagemDeServicoHTML = await gerarQuantidadesDeServicoHTML(mesSelecionado);
+        const horasPorFuncionarioHTML = await gerarHorasPorFuncionarioPDF(mesSelecionado);
+    
         const tabelaHTML = `
             <style>
                 table {
@@ -393,34 +434,11 @@ if (document.getElementById('tabela-servicos')) {
                 th {
                     background-color: #f2f2f2;
                 }
-                th:nth-child(1), td:nth-child(1) { width: 13%; }
-                th:nth-child(2), td:nth-child(2) { width: 12%; }
-                th:nth-child(3), td:nth-child(3) { width: 10%; }
-                th:nth-child(4), td:nth-child(4) { width: 10%; }
-                th:nth-child(5), td:nth-child(5) { width: 25%; }
-                th:nth-child(6), td:nth-child(6) { width: 15%; }
-                th:nth-child(7), td:nth-child(7) { width: 10%; }
-                .progress-bar-container {
-                    width: 100%;
-                    background-color: #f3f3f3;
-                    border-radius: 5px;
-                    margin-top: 5px;
-                }
-                .progress-bar {
-                    height: 15px;
-                    border-radius: 5px;
-                    text-align: center;
-                    color: white;
-                    font-weight: bold;
-                }
-                .emergencial { background-color: #ff6384; }
-                .qualidade { background-color: #36a2eb; }
-                .preventivo { background-color: #cc65fe; }
-                .ajuste { background-color: #ff9f40; }
             </style>
             <h1>Relatório de Serviços - Mês: ${mes} / ${ano}</h1>
             <br>
-            ${horasDeServicoHTML}
+            ${contagemDeServicoHTML}
+            ${horasPorFuncionarioHTML}
             <table id="tabela-exportar">
                 <thead>
                     <tr>
@@ -448,7 +466,7 @@ if (document.getElementById('tabela-servicos')) {
                 </tbody>
             </table>
         `;
-
+    
         const opt = {
             margin: 1,
             filename: `relatorio-servicos-${mes}-${ano}.pdf`,
@@ -456,9 +474,473 @@ if (document.getElementById('tabela-servicos')) {
             html2canvas: { scale: 2 },
             jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' }
         };
-
+    
         html2pdf().from(tabelaHTML).set(opt).save();
     }
+    
+    // Nova função para gerar a tabela de horas para o PDF
+    async function gerarHorasPorFuncionarioPDF(mesSelecionado) {
+        const [ano, mes] = mesSelecionado.split('-').map(Number);
+        const dataInicioMes = new Date(ano, mes - 1, 1);
+        const dataFimMes = new Date(ano, mes, 1);
+    
+        const servicosRef = collection(db, "servicos");
+        const q = query(
+            servicosRef,
+            where("dataRegistro", ">=", dataInicioMes),
+            where("dataRegistro", "<", dataFimMes)
+        );
+    
+        const querySnapshot = await getDocs(q);
+        const horasTrabalhadasPorFuncionario = {};
+        const diasTrabalhadosPorFuncionario = {};
+    
+        for (const funcionario in horasDisponiveisPorFuncionario) {
+            horasTrabalhadasPorFuncionario[funcionario] = 0;
+            diasTrabalhadosPorFuncionario[funcionario] = new Set();
+        }
+    
+        querySnapshot.forEach(doc => {
+            const dados = doc.data();
+            const { nomeFuncionario, dia, horaInicio, horaTermino } = dados;
+            
+            if (horasDisponiveisPorFuncionario.hasOwnProperty(nomeFuncionario)) {
+                const minutosTrabalhados = calcularDiferencaEmMinutos(horaInicio, horaTermino);
+                horasTrabalhadasPorFuncionario[nomeFuncionario] += minutosTrabalhados;
+                diasTrabalhadosPorFuncionario[nomeFuncionario].add(dia);
+            }
+        });
+    
+        let tabelaHTML = `
+            <h2>Horas por Funcionário</h2>
+            <table class="tabela-contagem">
+                <thead>
+                    <tr>
+                        <th>Funcionário</th>
+                        <th>Horas Disponíveis</th>
+                        <th>Horas Trabalhadas</th>
+                        <th>Aproveitamento</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+    
+        const funcionarios = Object.keys(horasDisponiveisPorFuncionario);
+    
+        if (funcionarios.length === 0) {
+            tabelaHTML += `<tr><td colspan="4">Nenhum funcionário cadastrado ou dados para o período.</td></tr>`;
+        } else {
+            for (const funcionario of funcionarios) {
+                const diasTrabalhados = diasTrabalhadosPorFuncionario[funcionario].size;
+                const horasDisponiveisEmMinutos = horasDisponiveisPorFuncionario[funcionario] * diasTrabalhados;
+                const horasTrabalhadasEmMinutos = horasTrabalhadasPorFuncionario[funcionario];
+                
+                let aproveitamento = 0;
+                let corClasse = '';
+    
+                if (horasDisponiveisEmMinutos > 0) {
+                    aproveitamento = (horasTrabalhadasEmMinutos / horasDisponiveisEmMinutos) * 100;
+                    if (aproveitamento > 100) {
+                        corClasse = 'red-text';
+                    } else if (aproveitamento < 50) {
+                        corClasse = 'yellow-text';
+                    }
+                }
+    
+                tabelaHTML += `
+                    <tr>
+                        <td>${funcionario}</td>
+                        <td>${formatarMinutosParaHoras(horasDisponiveisEmMinutos)}</td>
+                        <td>${formatarMinutosParaHoras(horasTrabalhadasEmMinutos)}</td>
+                        <td class="${corClasse}">${aproveitamento.toFixed(2)}%</td>
+                    </tr>
+                `;
+            }
+        }
+    
+        tabelaHTML += `
+                </tbody>
+            </table>
+        `;
+        
+        return tabelaHTML;
+    }
+    
+    // NOVA FUNÇÃO para exibir a contagem de serviços por tipo
+    async function exibirQuantidadesDeServico(mesSelecionado, inserirNoHtml = false) {
+        const quantidadesHTML = await gerarQuantidadesDeServicoHTML(mesSelecionado);
+        if (inserirNoHtml) {
+            const containerDados = document.getElementById('dados-turnos');
+            containerDados.innerHTML = quantidadesHTML;
+        }
+    }
+    
+    // NOVA FUNÇÃO para gerar o HTML da tabela de contagem
+    async function gerarQuantidadesDeServicoHTML(mesSelecionado) {
+        try {
+            if (!mesSelecionado) {
+                return `<h2>Quantidade de Serviços por Tipo</h2><p>Selecione um mês para exibir os dados.</p>`;
+            }
+    
+            const tiposServico = [
+                "ajuste/reparo/concerto",
+                "emergencial",
+                "inspecao/checklist",
+                "limpeza_e_organizacao",
+                "melhoria",
+                "preventiva",
+                "programada",
+                "qualidade",
+                "fabricacao_montagem",
+                "lubrificacao"
+            ];
+    
+            const [ano, mes] = mesSelecionado.split('-').map(Number);
+            const dataInicioMes = new Date(ano, mes - 1, 1);
+            const dataFimMes = new Date(ano, mes, 1);
+    
+            const servicosRef = collection(db, "servicos");
+            const q = query(
+                servicosRef,
+                where("dataRegistro", ">=", dataInicioMes),
+                where("dataRegistro", "<", dataFimMes)
+            );
+    
+            const querySnapshot = await getDocs(q);
+            const servicosUnicos = {};
+    
+            querySnapshot.forEach(doc => {
+                const dados = doc.data();
+                const chave = `${dados.turno}-${dados.dia}-${dados.horaInicio}-${dados.horaTermino}`;
+                
+                if (!servicosUnicos[chave]) {
+                    servicosUnicos[chave] = dados;
+                }
+            });
+    
+            const contagemPorTipo = {};
+            tiposServico.forEach(tipo => contagemPorTipo[tipo] = 0);
+    
+            for (const chave in servicosUnicos) {
+                const servico = servicosUnicos[chave];
+                if (contagemPorTipo.hasOwnProperty(servico.tipoServico)) {
+                    contagemPorTipo[servico.tipoServico]++;
+                }
+            }
+    
+            let horasHTML = `
+                <h2>Quantidade de Serviços por Tipo</h2>
+                <table class="tabela-contagem">
+                    <thead>
+                        <tr>
+                            <th>Tipo de Serviço</th>
+                            <th>Quantidade</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+    
+            if (Object.keys(servicosUnicos).length === 0) {
+                 horasHTML += `<tr><td colspan="2">Nenhum serviço encontrado para o período selecionado.</td></tr>`;
+            } else {
+                for (const tipo of tiposServico) {
+                    const quantidade = contagemPorTipo[tipo] || 0;
+                    if (quantidade > 0) {
+                        horasHTML += `
+                            <tr>
+                                <td>${tipo.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</td>
+                                <td>${quantidade}</td>
+                            </tr>
+                        `;
+                    }
+                }
+            }
+            
+            horasHTML += `
+                        </tbody>
+                    </table>
+                `;
+    
+            return horasHTML;
+    
+        } catch (error) {
+            console.error("Erro ao gerar HTML para quantidade de serviços: ", error);
+            return `<h2>Quantidade de Serviços por Tipo</h2><p>Erro ao carregar os dados.</p>`;
+        }
+    }
+
+    // Função para carregar dados de serviço da base de dados e criar botões de edição
+    async function carregarDadosServicos() {
+        try {
+            const filtroAtual = filtroSelecao.value;
+            let servicosRef = collection(db, "servicos");
+            let q;
+            let filtrosAplicados = false;
+    
+            if (filtroAtual === 'funcionario') {
+                const nomeFuncionario = formFiltros.elements.filtroFuncionario.value;
+                if (nomeFuncionario) {
+                    q = query(servicosRef, where("nomeFuncionario", "==", nomeFuncionario), orderBy("dataRegistro", "asc"), orderBy("horaInicio", "asc"));
+                    filtrosAplicados = true;
+                }
+            } else if (filtroAtual === 'tipoServico') {
+                const tipoServico = formFiltros.elements.filtroTipoServico.value;
+                if (tipoServico) {
+                    q = query(servicosRef, where("tipoServico", "==", tipoServico), orderBy("dataRegistro", "asc"), orderBy("horaInicio", "asc"));
+                    filtrosAplicados = true;
+                }
+            } else if (filtroAtual === 'turno') {
+                const turno = formFiltros.elements.filtroTurno.value;
+                if (turno) {
+                    q = query(servicosRef, where("turno", "==", turno), orderBy("dataRegistro", "asc"), orderBy("horaInicio", "asc"));
+                    filtrosAplicados = true;
+                }
+            } else if (filtroAtual === 'data') {
+                const dataFiltro = formFiltros.elements.filtroData.value;
+                if (dataFiltro) {
+                    const dataSelecionada = new Date(dataFiltro + 'T00:00:00');
+                    const proximoDia = new Date(dataSelecionada);
+                    proximoDia.setDate(proximoDia.getDate() + 1);
+                    q = query(servicosRef, where("dataRegistro", ">=", dataSelecionada), where("dataRegistro", "<", proximoDia), orderBy("dataRegistro", "asc"), orderBy("horaInicio", "asc"));
+                    filtrosAplicados = true;
+                }
+            }
+            
+            // Se nenhum filtro for aplicado ou o filtro estiver vazio, carregue todos os dados.
+            if (!filtrosAplicados) {
+                q = query(servicosRef, orderBy("dataRegistro", "asc"), orderBy("horaInicio", "asc"), orderBy("nomeFuncionario", "asc"));
+            }
+    
+            const querySnapshot = await getDocs(q);
+            tabelaCorpo.innerHTML = '';
+            querySnapshot.forEach((doc) => {
+                const dados = doc.data();
+                const row = tabelaCorpo.insertRow();
+                row.setAttribute('data-doc-id', doc.id); // Adiciona o ID do documento à linha para referência
+
+                row.insertCell(0).textContent = dados.nomeFuncionario;
+    
+                const dataObjeto = dados.dataRegistro.toDate();
+                const dataFormatada = dataObjeto.toLocaleDateString('pt-BR');
+                row.insertCell(1).textContent = dataFormatada;
+    
+                row.insertCell(2).textContent = dados.horaInicio;
+                row.insertCell(3).textContent = dados.horaTermino;
+                row.insertCell(4).textContent = dados.nomeServico;
+                row.insertCell(5).textContent = dados.tipoServico;
+                row.insertCell(6).textContent = dados.turno;
+
+                const cellAcoes = row.insertCell(7);
+                cellAcoes.classList.add('acoes-celula');
+
+                // Botão Editar
+                const btnEditar = document.createElement('button');
+                btnEditar.textContent = 'Editar';
+                btnEditar.classList.add('btn', 'btn-editar');
+                btnEditar.addEventListener('click', () => iniciarEdicao(doc.id, dados, row));
+                cellAcoes.appendChild(btnEditar);
+
+                // Botão Excluir
+                const btnExcluir = document.createElement('button');
+                btnExcluir.textContent = 'Excluir';
+                btnExcluir.classList.add('btn', 'btn-excluir');
+                btnExcluir.addEventListener('click', () => excluirServico(doc.id));
+                cellAcoes.appendChild(btnExcluir);
+            });
+    
+            if (filtrosAplicados) {
+                tabelaContainer.scrollTop = 0;
+            } else {
+                tabelaContainer.scrollTop = tabelaContainer.scrollHeight;
+            }
+    
+        } catch (error) {
+            console.error("Erro ao carregar dados: ", error);
+        }
+    }
+    
+    // NOVO: Função para iniciar o processo de edição
+    function iniciarEdicao(docId, dados, row) {
+        // Encontra a linha da tabela a partir do docId
+        const linha = document.querySelector(`tr[data-doc-id="${docId}"]`);
+        if (!linha) return;
+
+        // Armazena os dados originais e o ID
+        linha.setAttribute('data-doc-id', docId);
+        linha.setAttribute('data-original-data', JSON.stringify(dados));
+
+        // Transforma cada célula em um input editável
+        for (let i = 0; i < 7; i++) {
+            const celula = linha.cells[i];
+            const valorAtual = celula.textContent;
+            celula.innerHTML = '';
+            
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = valorAtual;
+            input.classList.add('input-edicao');
+            celula.appendChild(input);
+        }
+
+        // Substitui os botões de ação
+        const celulaAcoes = linha.cells[7];
+        celulaAcoes.innerHTML = '';
+
+        const btnSalvar = document.createElement('button');
+        btnSalvar.textContent = 'Salvar';
+        btnSalvar.classList.add('btn', 'btn-salvar');
+        btnSalvar.addEventListener('click', () => salvarEdicao(docId, linha));
+        celulaAcoes.appendChild(btnSalvar);
+
+        const btnCancelar = document.createElement('button');
+        btnCancelar.textContent = 'Cancelar';
+        btnCancelar.classList.add('btn', 'btn-cancelar');
+        btnCancelar.addEventListener('click', () => {
+            const originalData = JSON.parse(linha.getAttribute('data-original-data'));
+            cancelarEdicao(linha, originalData);
+        });
+        celulaAcoes.appendChild(btnCancelar);
+    }
+
+    // NOVO: Função para salvar a edição no Firebase
+    async function salvarEdicao(docId, row) {
+        try {
+            const servicoRef = doc(db, "servicos", docId);
+            const dadosAtualizados = {
+                nomeFuncionario: row.cells[0].querySelector('input').value,
+                dia: new Date(row.cells[1].querySelector('input').value).toISOString().split('T')[0], // Converte para o formato de dia
+                horaInicio: row.cells[2].querySelector('input').value,
+                horaTermino: row.cells[3].querySelector('input').value,
+                nomeServico: row.cells[4].querySelector('input').value,
+                tipoServico: row.cells[5].querySelector('input').value,
+                turno: row.cells[6].querySelector('input').value
+            };
+            
+            // Corrige o formato da data para o Firestore
+            dadosAtualizados.dataRegistro = new Date(dadosAtualizados.dia.replace(/-/g, '\/'));
+            
+            await updateDoc(servicoRef, dadosAtualizados);
+            alert("Serviço atualizado com sucesso!");
+            carregarDadosServicos(); // Recarrega os dados para mostrar as alterações
+        } catch (error) {
+            console.error("Erro ao atualizar documento: ", error);
+            alert("Erro ao salvar. Verifique o console.");
+        }
+    }
+    
+    // NOVO: Função para cancelar a edição
+    function cancelarEdicao(row, originalData) {
+        row.cells[0].innerHTML = originalData.nomeFuncionario;
+        row.cells[1].innerHTML = originalData.dataRegistro.toDate().toLocaleDateString('pt-BR');
+        row.cells[2].innerHTML = originalData.horaInicio;
+        row.cells[3].innerHTML = originalData.horaTermino;
+        row.cells[4].innerHTML = originalData.nomeServico;
+        row.cells[5].innerHTML = originalData.tipoServico;
+        row.cells[6].innerHTML = originalData.turno;
+
+        const cellAcoes = row.cells[7];
+        cellAcoes.innerHTML = '';
+
+        const btnEditar = document.createElement('button');
+        btnEditar.textContent = 'Editar';
+        btnEditar.classList.add('btn', 'btn-editar');
+        btnEditar.addEventListener('click', () => iniciarEdicao(row.getAttribute('data-doc-id'), originalData, row));
+        cellAcoes.appendChild(btnEditar);
+
+        const btnExcluir = document.createElement('button');
+        btnExcluir.textContent = 'Excluir';
+        btnExcluir.classList.add('btn', 'btn-excluir');
+        btnExcluir.addEventListener('click', () => excluirServico(row.getAttribute('data-doc-id')));
+        cellAcoes.appendChild(btnExcluir);
+    }
+    
+    // NOVO: Função para excluir um serviço
+    async function excluirServico(docId) {
+        if (confirm("Tem certeza que deseja excluir este serviço?")) {
+            try {
+                const servicoRef = doc(db, "servicos", docId);
+                await deleteDoc(servicoRef);
+                alert("Serviço excluído com sucesso!");
+                carregarDadosServicos(); // Recarrega os dados para remover a linha
+            } catch (error) {
+                console.error("Erro ao excluir documento: ", error);
+                alert("Erro ao excluir. Verifique o console.");
+            }
+        }
+    }
+
+    // Event Listeners
+    formFiltros.addEventListener('submit', (e) => {
+        e.preventDefault();
+        carregarDadosServicos();
+    });
+
+    filtroSelecao.addEventListener('change', () => {
+        Object.values(containersFiltro).forEach(container => container.style.display = 'none');
+        const filtroSelecionado = filtroSelecao.value;
+        if (filtroSelecionado !== 'nenhum') {
+            containersFiltro[filtroSelecionado].style.display = 'block';
+        }
+    });
+
+    btnLimpar.addEventListener('click', () => {
+        formFiltros.reset();
+        Object.values(containersFiltro).forEach(container => container.style.display = 'none');
+        carregarDadosServicos();
+    });
+
+    aplicarFiltroMesBtn.addEventListener('click', () => {
+        const mesSelecionado = filtroMesInput.value;
+        if (mesSelecionado) {
+            exibirQuantidadesDeServico(mesSelecionado, true);
+            exibirHorasPorFuncionario(mesSelecionado);
+        } else {
+            alert("Por favor, selecione um mês.");
+        }
+    });
+
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            carregarDadosServicos();
+        } else {
+            window.location.href = 'login.html';
+        }
+    });
+
+    document.getElementById('logout').addEventListener('click', async () => {
+        try {
+            await signOut(auth);
+            window.location.href = 'login.html';
+        } catch (error) {
+            console.error("Erro ao fazer logout: ", error);
+        }
+    });
+
+    
+    // ======================================================================================
+    // FIM DAS FUNÇÕES
+    // ======================================================================================
+    
+    // Listener para o novo botão de filtro por mês
+    if (aplicarFiltroMesBtn) {
+        aplicarFiltroMesBtn.addEventListener('click', () => {
+            exibirQuantidadesDeServico(filtroMesInput.value, true);
+            exibirHorasPorFuncionario(filtroMesInput.value);
+        });
+    }
+    
+    // Listener para o botão de alternância (agora mostra contagem)
+    toggleBtn.addEventListener('click', () => {
+        if (visualizadorHoras.style.display === 'none') {
+            visualizadorHoras.style.display = 'block';
+            toggleBtn.textContent = 'Ocultar Resumo';
+            exibirQuantidadesDeServico(filtroMesInput.value, true);
+            exibirHorasPorFuncionario(filtroMesInput.value);
+        } else {
+            visualizadorHoras.style.display = 'none';
+            toggleBtn.textContent = 'Mostrar Resumo';
+        }
+    });
 
     // Adiciona os listeners para o modal
     exportarPDFBtn.addEventListener('click', () => {
@@ -479,131 +961,12 @@ if (document.getElementById('tabela-servicos')) {
         }
     });
 
-    // Evento para fechar o modal clicando fora dele
     window.addEventListener('click', (event) => {
         if (event.target === modalContainer) {
             modalContainer.style.display = 'none';
         }
     });
 
-    // FUNÇÃO PARA EXIBIR HORAS COM GRÁFICO E FILTRO DE MÊS
-    async function exibirHorasDeServicoPorTurno(mesSelecionado, inserirNoHtml = false) {
-        const horasHTML = await gerarHorasDeServicoHTML(mesSelecionado);
-        if (inserirNoHtml) {
-            const containerDados = document.getElementById('dados-turnos');
-            containerDados.innerHTML = horasHTML;
-        }
-    }
-
-    // NOVA FUNÇÃO para gerar apenas o HTML do gráfico de horas, com a nova lógica de horas.minutos
-    async function gerarHorasDeServicoHTML(mesSelecionado) {
-        try {
-            if (!mesSelecionado) {
-                return `<h2>Horas de Serviço por Turno</h2><p>Selecione um mês para exibir os dados.</p>`;
-            }
-
-            const turnos = ["1 turno", "2 turno", "3 turno"];
-            const tiposServico = ["emergencial", "qualidade", "preventivo", "ajuste"];
-
-            const [ano, mes] = mesSelecionado.split('-').map(Number);
-            const dataInicioMes = new Date(ano, mes - 1, 1);
-            const dataFimMes = new Date(ano, mes, 1);
-
-            const servicosRef = collection(db, "servicos");
-            const q = query(
-                servicosRef,
-                where("dataRegistro", ">=", dataInicioMes),
-                where("dataRegistro", "<", dataFimMes)
-            );
-
-            const querySnapshot = await getDocs(q);
-            const dadosPorTurno = {};
-
-            querySnapshot.forEach(doc => {
-                const dados = doc.data();
-                const turno = dados.turno;
-                const tipo = dados.tipoServico;
-                const horaInicio = dados.horaInicio;
-                const horaTermino = dados.horaTermino;
-
-                if (turnos.includes(turno) && tiposServico.includes(tipo)) {
-                    const [hInicio, mInicio] = (horaInicio || '00:00').split(':').map(Number);
-                    const [hTermino, mTermino] = (horaTermino || '00:00').split(':').map(Number);
-
-                    if (!isNaN(hInicio) && !isNaN(mInicio) && !isNaN(hTermino) && !isNaN(mTermino)) {
-                        let totalMinutos = (hTermino * 60 + mTermino) - (hInicio * 60 + mInicio);
-                        if (totalMinutos < 0) totalMinutos += 24 * 60;
-
-                        if (!dadosPorTurno[turno]) dadosPorTurno[turno] = {};
-                        if (!dadosPorTurno[turno][tipo]) dadosPorTurno[turno][tipo] = 0;
-
-                        dadosPorTurno[turno][tipo] += totalMinutos;
-                    }
-                }
-            });
-
-            const meta = { emergencial: 60, qualidade: 70, preventivo: 50, ajuste: 20 };
-            let horasHTML = `
-                <h2>Horas de Serviço por Turno</h2>
-                <style>
-                    .progress-bar-container {
-                        width: 100%;
-                        background-color: #f3f3f3;
-                        border-radius: 5px;
-                        margin-top: 5px;
-                    }
-                    .progress-bar {
-                        height: 15px;
-                        border-radius: 5px;
-                        text-align: center;
-                        color: white;
-                        font-weight: bold;
-                    }
-                    .emergencial { background-color: #ff6384; }
-                    .qualidade { background-color: #36a2eb; }
-                    .preventivo { background-color: #cc65fe; }
-                    .ajuste { background-color: #ff9f40; }
-                </style>
-            `;
-
-            if (Object.keys(dadosPorTurno).length === 0) {
-                return horasHTML + `<p>Nenhum dado de serviço encontrado para o período selecionado.</p>`;
-            }
-
-            for (const turno of turnos) {
-                hoursHTML += `<h3>Turno: ${turno}</h3><ul>`;
-
-                for (const tipo of tiposServico) {
-                    const totalMinutosAcumulados = (dadosPorTurno[turno] && dadosPorTurno[turno][tipo]) || 0;
-                    const horasInteiras = Math.floor(totalMinutosAcumulados / 60);
-                    const minutosRestantes = totalMinutosAcumulados % 60;
-                    const minutosFormatados = String(minutosRestantes).padStart(2, '0');
-                    const horasFormatadas = `${horasInteiras}.${minutosFormatados}`;
-
-                    const metaEmMinutos = meta[tipo] * 60;
-                    let porcentagem = metaEmMinutos > 0 ? (totalMinutosAcumulados / metaEmMinutos) * 100 : 0;
-                    porcentagem = Math.min(porcentagem, 100);
-
-                    hoursHTML += `
-                    <li>
-                        ${tipo}: ${horasFormatadas} horas (${porcentagem.toFixed(0)}%)
-                        <div class="progress-bar-container">
-                            <div class="progress-bar ${tipo}" style="width: ${porcentagem.toFixed(0)}%;"></div>
-                        </div>
-                    </li>`;
-                }
-                hoursHTML += '</ul>';
-            }
-
-            return hoursHTML;
-
-        } catch (error) {
-            console.error("Erro ao gerar HTML para horas de serviço: ", error);
-            return `<h2>Horas de Serviço por Turno</h2><p>Erro ao carregar os dados.</p>`;
-        }
-    }
-
-    // Adiciona o listener para o filtro de seleção
     filtroSelecao.addEventListener('change', (e) => {
         for (const key in containersFiltro) {
             containersFiltro[key].style.display = 'none';
@@ -634,7 +997,8 @@ if (document.getElementById('tabela-servicos')) {
     onAuthStateChanged(auth, (user) => {
         if (user) {
             carregarDadosServicos();
-            exibirHorasDeServicoPorTurno(filtroMesInput.value, true);
+            exibirQuantidadesDeServico(filtroMesInput.value, true);
+            exibirHorasPorFuncionario(filtroMesInput.value);
         } else {
             window.location.href = 'login.html';
         }

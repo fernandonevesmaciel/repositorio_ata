@@ -329,3 +329,13 @@ th {
     margin: 20px;
     width: 200px; /* Ou o valor que você preferir */
 }
+
+.red-text {
+    color: red;
+    font-weight: bold;
+}
+
+.yellow-text {
+    color: rgb(189, 189, 0); /* Amarelo */
+    font-weight: bold;
+}
