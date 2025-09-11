@@ -255,6 +255,7 @@ if (document.getElementById('tabela-servicos')) {
     // Novos elementos de filtro de horas
     const filtroMesInput = document.getElementById('filtro-mes');
     const aplicarFiltroMesBtn = document.getElementById('aplicar-filtro-mes-btn');
+    const jornadaDiariaEmMinutos = 440; // 7h20m convertidos para minutos
 
     // Nova estrutura de dados para horas disponíveis por funcionário
     const horasDisponiveisPorFuncionario = {
@@ -270,7 +271,6 @@ if (document.getElementById('tabela-servicos')) {
         "Jonathan": 440,
         "Cleiton": 440,
         "Phelipe": 440
-        // A jornada de trabalho de 7h20m convertida para minutos (7 * 60 + 20)
     };
 
     // ======================================================================================
@@ -304,7 +304,6 @@ if (document.getElementById('tabela-servicos')) {
     }
 
     // NOVA FUNÇÃO para exibir a tabela de horas por funcionário
-    // NOVA FUNÇÃO para exibir a tabela de horas por funcionário
     async function exibirHorasPorFuncionario(mesSelecionado) {
         if (!containerHorasDisponiveis) {
             console.error("Elemento 'container-horas-disponiveis' não encontrado.");
@@ -324,17 +323,20 @@ if (document.getElementById('tabela-servicos')) {
 
         const querySnapshot = await getDocs(q);
         const horasTrabalhadasPorFuncionario = {};
-        const horasDisponiveisPorFuncionarioCalculadas = {};
         const diasTrabalhadosPorFuncionario = {};
+
+        // INICIALIZAÇÃO DAS VARIÁVEIS DE TOTAIS
+        let totalHorasDisponiveisMinutos = 0;
+        let totalHorasTrabalhadasMinutos = 0;
+        let funcionariosComDados = 0;
 
         // Inicializa contadores
         for (const funcionario in horasDisponiveisPorFuncionario) {
             horasTrabalhadasPorFuncionario[funcionario] = 0;
-            horasDisponiveisPorFuncionarioCalculadas[funcionario] = 0;
             diasTrabalhadosPorFuncionario[funcionario] = new Set();
         }
 
-        // Soma as horas trabalhadas, as horas disponíveis e conta os dias
+        // Soma as horas trabalhadas e conta os dias únicos
         querySnapshot.forEach(doc => {
             const dados = doc.data();
             const { nomeFuncionario, horaInicio, horaTermino, dataRegistro } = dados;
@@ -342,10 +344,6 @@ if (document.getElementById('tabela-servicos')) {
             if (horasDisponiveisPorFuncionario.hasOwnProperty(nomeFuncionario)) {
                 const minutosTrabalhados = calcularDiferencaEmMinutos(horaInicio, horaTermino);
                 horasTrabalhadasPorFuncionario[nomeFuncionario] += minutosTrabalhados;
-
-                horasDisponiveisPorFuncionarioCalculadas[nomeFuncionario] += horasDisponiveisPorFuncionario[nomeFuncionario];
-
-                // Adiciona a data ao Set para contar dias únicos
                 const dataString = dataRegistro.toDate().toISOString().split('T')[0];
                 diasTrabalhadosPorFuncionario[nomeFuncionario].add(dataString);
             }
@@ -373,9 +371,9 @@ if (document.getElementById('tabela-servicos')) {
             tabelaHTML += `<tr><td colspan="5">Nenhum funcionário cadastrado ou dados para o período.</td></tr>`;
         } else {
             for (const funcionario of funcionarios) {
-                const horasDisponiveisEmMinutos = horasDisponiveisPorFuncionarioCalculadas[funcionario];
-                const horasTrabalhadasEmMinutos = horasTrabalhadasPorFuncionario[funcionario];
                 const diasTrabalhados = diasTrabalhadosPorFuncionario[funcionario].size;
+                const horasDisponiveisEmMinutos = diasTrabalhados * jornadaDiariaEmMinutos;
+                const horasTrabalhadasEmMinutos = horasTrabalhadasPorFuncionario[funcionario];
 
                 let aproveitamento = 0;
                 let corClasse = '';
@@ -389,6 +387,13 @@ if (document.getElementById('tabela-servicos')) {
                     }
                 }
 
+                // Acumula os totais para o cálculo do aproveitamento da equipe
+                if (diasTrabalhados > 0) {
+                    totalHorasDisponiveisMinutos += horasDisponiveisEmMinutos;
+                    totalHorasTrabalhadasMinutos += horasTrabalhadasEmMinutos;
+                    funcionariosComDados++;
+                }
+
                 tabelaHTML += `
                 <tr>
                     <td>${funcionario}</td>
@@ -399,6 +404,29 @@ if (document.getElementById('tabela-servicos')) {
                 </tr>
             `;
             }
+
+            // ====================================================================
+            // NOVO CÁLCULO DE APROVEITAMENTO DA EQUIPE
+            // ====================================================================
+            let aproveitamentoTotalEquipe = 0;
+            if (totalHorasDisponiveisMinutos > 0) {
+                aproveitamentoTotalEquipe = (totalHorasTrabalhadasMinutos / totalHorasDisponiveisMinutos) * 100;
+            }
+
+            let corTotalAproveitamento = '';
+            if (aproveitamentoTotalEquipe < 80 || aproveitamentoTotalEquipe > 99) {
+                corTotalAproveitamento = 'red-text';
+            }
+
+            tabelaHTML += `
+            <tr class="tabela-totais">
+                <td><strong>Total da Equipe</strong></td>
+                <td><strong>${formatarMinutosParaHoras(totalHorasDisponiveisMinutos)}</strong></td>
+                <td><strong>${formatarMinutosParaHoras(totalHorasTrabalhadasMinutos)}</strong></td>
+                <td class="${corTotalAproveitamento}"><strong>${aproveitamentoTotalEquipe.toFixed(2)}%</strong></td>
+                <td></td>
+            </tr>
+        `;
         }
 
         tabelaHTML += `
@@ -471,35 +499,7 @@ if (document.getElementById('tabela-servicos')) {
         <div class="tabela-relatorio">
             ${horasPorFuncionarioHTML}
         </div>
-        <div class="tabela-relatorio">
-            <h2>Serviços realizados no mês</h2>
-            <table id="tabela-exportar">
-                <thead>
-                    <tr>
-                        <th>Funcionário</th>
-                        <th>Dia</th>
-                        <th>Hora Início</th>
-                        <th>Hora Término</th>
-                        <th>Nome Serviço</th>
-                        <th>Tipo Serviço</th>
-                        <th>Turno</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${dadosExportar.map(dados => `
-                        <tr>
-                            <td>${dados.nomeFuncionario}</td>
-                            <td>${dados.dataRegistro.toDate().toLocaleDateString('pt-BR')}</td>
-                            <td>${dados.horaInicio}</td>
-                            <td>${dados.horaTermino}</td>
-                            <td>${dados.nomeServico}</td>
-                            <td>${dados.tipoServico}</td>
-                            <td>${dados.turno}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        </div>
+
     `;
 
         const opt = {
@@ -530,6 +530,10 @@ if (document.getElementById('tabela-servicos')) {
         const horasTrabalhadasPorFuncionario = {};
         const diasTrabalhadosPorFuncionario = {};
 
+        // INICIALIZAÇÃO DAS VARIÁVEIS DE TOTAIS
+        let totalHorasDisponiveisMinutos = 0;
+        let totalHorasTrabalhadasMinutos = 0;
+
         for (const funcionario in horasDisponiveisPorFuncionario) {
             horasTrabalhadasPorFuncionario[funcionario] = 0;
             diasTrabalhadosPorFuncionario[funcionario] = new Set();
@@ -537,12 +541,13 @@ if (document.getElementById('tabela-servicos')) {
 
         querySnapshot.forEach(doc => {
             const dados = doc.data();
-            const { nomeFuncionario, dia, horaInicio, horaTermino } = dados;
+            const { nomeFuncionario, horaInicio, horaTermino, dataRegistro } = dados;
 
             if (horasDisponiveisPorFuncionario.hasOwnProperty(nomeFuncionario)) {
                 const minutosTrabalhados = calcularDiferencaEmMinutos(horaInicio, horaTermino);
                 horasTrabalhadasPorFuncionario[nomeFuncionario] += minutosTrabalhados;
-                diasTrabalhadosPorFuncionario[nomeFuncionario].add(dia);
+                const dataString = dataRegistro.toDate().toISOString().split('T')[0];
+                diasTrabalhadosPorFuncionario[nomeFuncionario].add(dataString);
             }
         });
 
@@ -555,6 +560,7 @@ if (document.getElementById('tabela-servicos')) {
                         <th>Horas Disponíveis</th>
                         <th>Horas Trabalhadas</th>
                         <th>Aproveitamento</th>
+                        <th>Dias Trabalhados</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -563,11 +569,11 @@ if (document.getElementById('tabela-servicos')) {
         const funcionarios = Object.keys(horasDisponiveisPorFuncionario);
 
         if (funcionarios.length === 0) {
-            tabelaHTML += `<tr><td colspan="4">Nenhum funcionário cadastrado ou dados para o período.</td></tr>`;
+            tabelaHTML += `<tr><td colspan="5">Nenhum funcionário cadastrado ou dados para o período.</td></tr>`;
         } else {
             for (const funcionario of funcionarios) {
                 const diasTrabalhados = diasTrabalhadosPorFuncionario[funcionario].size;
-                const horasDisponiveisEmMinutos = horasDisponiveisPorFuncionario[funcionario] * diasTrabalhados;
+                const horasDisponiveisEmMinutos = diasTrabalhados * jornadaDiariaEmMinutos;
                 const horasTrabalhadasEmMinutos = horasTrabalhadasPorFuncionario[funcionario];
 
                 let aproveitamento = 0;
@@ -582,15 +588,45 @@ if (document.getElementById('tabela-servicos')) {
                     }
                 }
 
+                // Acumula os totais para o cálculo do aproveitamento da equipe
+                if (diasTrabalhados > 0) {
+                    totalHorasDisponiveisMinutos += horasDisponiveisEmMinutos;
+                    totalHorasTrabalhadasMinutos += horasTrabalhadasEmMinutos;
+                }
+
                 tabelaHTML += `
                     <tr>
                         <td>${funcionario}</td>
                         <td>${formatarMinutosParaHoras(horasDisponiveisEmMinutos)}</td>
                         <td>${formatarMinutosParaHoras(horasTrabalhadasEmMinutos)}</td>
                         <td class="${corClasse}">${aproveitamento.toFixed(2)}%</td>
+                        <td>${diasTrabalhados}</td>
                     </tr>
                 `;
             }
+
+            // ====================================================================
+            // CÁLCULO DE APROVEITAMENTO DA EQUIPE NO PDF
+            // ====================================================================
+            let aproveitamentoTotalEquipe = 0;
+            if (totalHorasDisponiveisMinutos > 0) {
+                aproveitamentoTotalEquipe = (totalHorasTrabalhadasMinutos / totalHorasDisponiveisMinutos) * 100;
+            }
+
+            let corTotalAproveitamento = '';
+            if (aproveitamentoTotalEquipe < 80 || aproveitamentoTotalEquipe > 99) {
+                corTotalAproveitamento = 'red-text';
+            }
+
+            tabelaHTML += `
+                <tr class="tabela-totais">
+                    <td><strong>Total da Equipe</strong></td>
+                    <td><strong>${formatarMinutosParaHoras(totalHorasDisponiveisMinutos)}</strong></td>
+                    <td><strong>${formatarMinutosParaHoras(totalHorasTrabalhadasMinutos)}</strong></td>
+                    <td class="${corTotalAproveitamento}"><strong>${aproveitamentoTotalEquipe.toFixed(2)}%</strong></td>
+                    <td></td>
+                </tr>
+            `;
         }
 
         tabelaHTML += `
@@ -795,6 +831,7 @@ if (document.getElementById('tabela-servicos')) {
     }
 
     // NOVO: Função para iniciar o processo de edição
+    // Função para iniciar a edição
     function iniciarEdicao(docId, dados, row) {
         // Encontra a linha da tabela a partir do docId
         const linha = document.querySelector(`tr[data-doc-id="${docId}"]`);
@@ -804,15 +841,27 @@ if (document.getElementById('tabela-servicos')) {
         linha.setAttribute('data-doc-id', docId);
         linha.setAttribute('data-original-data', JSON.stringify(dados));
 
+        // Define os campos que são inputs editáveis
+        const campos = ['nomeFuncionario', 'dataRegistro', 'horaInicio', 'horaTermino', 'nomeServico', 'tipoServico', 'turno'];
+
         // Transforma cada célula em um input editável
-        for (let i = 0; i < 7; i++) {
+        for (let i = 0; i < campos.length; i++) {
             const celula = linha.cells[i];
-            const valorAtual = celula.textContent;
+            let valorAtual = celula.textContent;
             celula.innerHTML = '';
 
             const input = document.createElement('input');
             input.type = 'text';
-            input.value = valorAtual;
+
+            // Lógica especial para a data
+            if (campos[i] === 'dataRegistro') {
+                const dataObj = dados.dataRegistro.toDate();
+                input.type = 'date'; // Usa o tipo 'date' para um melhor seletor
+                input.value = dataObj.toISOString().split('T')[0];
+            } else {
+                input.value = valorAtual;
+            }
+
             input.classList.add('input-edicao');
             celula.appendChild(input);
         }
@@ -843,7 +892,7 @@ if (document.getElementById('tabela-servicos')) {
             const servicoRef = doc(db, "servicos", docId);
             const dadosAtualizados = {
                 nomeFuncionario: row.cells[0].querySelector('input').value,
-                dia: new Date(row.cells[1].querySelector('input').value).toISOString().split('T')[0], // Converte para o formato de dia
+                dataRegistro: new Date(row.cells[1].querySelector('input').value + 'T00:00:00'),
                 horaInicio: row.cells[2].querySelector('input').value,
                 horaTermino: row.cells[3].querySelector('input').value,
                 nomeServico: row.cells[4].querySelector('input').value,
@@ -851,9 +900,7 @@ if (document.getElementById('tabela-servicos')) {
                 turno: row.cells[6].querySelector('input').value
             };
 
-            // Corrige o formato da data para o Firestore
-            dadosAtualizados.dataRegistro = new Date(dadosAtualizados.dia.replace(/-/g, '\/'));
-
+            // Atualiza a data de registro
             await updateDoc(servicoRef, dadosAtualizados);
             alert("Serviço atualizado com sucesso!");
             carregarDadosServicos(); // Recarrega os dados para mostrar as alterações
