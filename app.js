@@ -4,13 +4,13 @@ import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, updat
 
 // Sua configuração do Firebase
 const firebaseConfig = {
-    apiKey: "AIzaSyDdbz1Uuy1vniu3yQUK2JKk7qlYi1qc-_A",
-    authDomain: "controle-de-servicos-420f4.firebaseapp.com",
-    projectId: "controle-de-servicos-420f4",
-    storageBucket: "controle-de-servicos-420f4.firebase-storage.app",
-    messagingSenderId: "1096927390065",
-    appId: "1:1096927390065:web:6b464e8c69ff3d5166eed0",
-    measurementId: "G-VNKBGDEZYE"
+    apiKey: "AIzaSyAN_UVg8c9Cdcvok9-WHXJiZYnOdcmpMjI",
+    authDomain: "repositoriomacanica.firebaseapp.com",
+    projectId: "repositoriomacanica",
+    storageBucket: "repositoriomacanica.firebasestorage.app",
+    messagingSenderId: "10549769581",
+    appId: "1:10549769581:web:80cbf33ee9d3af31ac9664",
+    measurementId: "G-JLTGTXC8MD"
 };
 
 // Inicializa o Firebase
@@ -259,18 +259,22 @@ if (document.getElementById('tabela-servicos')) {
 
     // Nova estrutura de dados para horas disponíveis por funcionário
     const horasDisponiveisPorFuncionario = {
-        "Rafael": 440,
-        "Fernando": 440,
-        "Marcos": 440,
-        "Alisson": 440,
-        "Eduardo": 440,
-        "Matheus": 440,
-        "Gregory": 440,
-        "Vinicius": 440,
-        "Simei": 440,
-        "Jonathan": 440,
-        "Cleiton": 440,
-        "Phelipe": 440
+        "Valdinei": 440,
+        "Wanner": 440,
+        "Sandro": 440,
+        "Victor": 440,
+        "Ericky": 440,
+        "Endrew": 440,
+        "André Bacceto": 440,
+        "Guilherme": 440,
+        "Abib": 440,
+        "Diogo": 440,
+        "Luiz Felipe": 440,
+        "Fabiano": 440,
+        "Leigmar": 440,
+        "Vitor Reis": 440,
+        "Gabriel": 440,
+        "Allison": 440
     };
 
     // ======================================================================================
@@ -437,7 +441,7 @@ if (document.getElementById('tabela-servicos')) {
         containerHorasDisponiveis.innerHTML = tabelaHTML;
     }
     // Função para exportar a tabela visível para PDF
-    async function exportarParaPDF(mesSelecionado) {
+     async function exportarParaPDF(mesSelecionado) {
         if (!mesSelecionado) return;
 
         const [ano, mes] = mesSelecionado.split('-').map(Number);
@@ -496,7 +500,7 @@ if (document.getElementById('tabela-servicos')) {
         <div class="tabela-relatorio">
             ${contagemDeServicoHTML}
         </div>
-        <div class="tabela-relatorio">
+        <div>
             ${horasPorFuncionarioHTML}
         </div>
 

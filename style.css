@@ -76,6 +76,7 @@ table {
     width: 100%;
     border-collapse: collapse;
     margin-top: 20px;
+    font-size: 1em;
 }
 
 th, td {
@@ -343,6 +344,7 @@ th {
 @media print {
   table, tr, td {
     page-break-inside: avoid !important;
+    font-size: 1em;
   }
 }
 
